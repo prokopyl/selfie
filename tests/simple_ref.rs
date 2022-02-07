@@ -1,31 +1,36 @@
 use pinhead::{PinHead, PinHeaded, RefHandle};
-use std::ops::Deref;
+use std::pin::Pin;
 
-struct StrRef;
-
-impl<'a> PinHeaded<'a> for StrRef {
-    type Ref = &'a str;
-}
-
-struct SelfReferential {
-    strings: PinHead<Box<String>, StrRef>,
-}
-
-fn foo<'a>(str: &'a String) -> <StrRef as PinHeaded<'a>>::Ref {
-    &str[0..5]
+struct BoxAndRef {
+    data: PinHead<Box<i32>, RefHandle<i32>>,
 }
 
 #[test]
 pub fn simple_ref() {
-    let str = Box::pin("Hello, world!".to_owned());
+    let my_int = Box::pin(42);
+    let data = PinHead::new(my_int, |i| i);
 
-    let strings = PinHead::<Box<String>, StrRef>::new(str, move |s| &s[0..5]);
-
-    let self_referential = SelfReferential { strings };
-
+    let box_and_ref = BoxAndRef { data };
     println!(
         "{} <- {}",
-        self_referential.strings.owned(),
-        self_referential.strings.referential()
-    )
+        box_and_ref.data.owned(),
+        box_and_ref.data.referential()
+    );
+}
+
+struct BoxAndStr {
+    data: PinHead<Box<str>, RefHandle<str>>,
+}
+
+#[test]
+pub fn simple_str() {
+    let my_int = Pin::new("Hello, world!".to_owned().into_boxed_str());
+    let data = PinHead::new(my_int, |i| &i[0..5]);
+
+    let box_and_ref = BoxAndStr { data };
+    println!(
+        "{} <- {}",
+        box_and_ref.data.owned(),
+        box_and_ref.data.referential()
+    );
 }
