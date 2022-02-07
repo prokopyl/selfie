@@ -1,4 +1,5 @@
-use selfie::{PinnedSelfie, Ref, RefType, Selfie, SelfieMut};
+use selfie::refs::{Ref, RefType};
+use selfie::{PinnedSelfie, Selfie, SelfieMut};
 use std::pin::Pin;
 use std::sync::Arc;
 
@@ -24,8 +25,7 @@ pub fn simple_str() {
     assert_eq!("Hello, world!", data.owned());
     assert_eq!(&"Hello", data.referential());
 
-    let val = data;
-    let data = Box::new(val);
+    let data = Box::new(data);
 
     assert_eq!("Hello, world!", data.owned());
     assert_eq!(&"Hello", data.referential());
