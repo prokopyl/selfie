@@ -1,5 +1,6 @@
-use selfie::{Ref, RefType, Selfie, SelfieMut};
+use selfie::{PinnedSelfie, Ref, RefType, Selfie, SelfieMut};
 use std::pin::Pin;
+use std::sync::Arc;
 
 #[test]
 pub fn simple_int() {
@@ -28,6 +29,20 @@ pub fn simple_str() {
 
     assert_eq!("Hello, world!", data.owned());
     assert_eq!(&"Hello", data.referential());
+}
+
+#[test]
+pub fn different_int() {
+    let my_int = Arc::pin(42);
+    let data: Selfie<Arc<i32>, Ref<i32>> = Selfie::new(my_int, |i| i);
+
+    assert_eq!(42, *data.owned());
+    assert_eq!(&42, *data.referential());
+
+    let data = Box::new(data);
+
+    assert_eq!(42, *data.owned());
+    assert_eq!(&42, *data.referential());
 }
 
 struct Point<'a> {
@@ -98,6 +113,24 @@ pub fn drops() {
     let data = Box::new(data);
     assert_eq!("Hello", data.owned());
     assert_eq!("Hello", data.referential().value);
+
+    drop(data);
+}
+
+#[test]
+pub fn pinned() {
+    let data: Pin<Box<PinnedSelfie<i32, Ref<i32>>>> =
+        PinnedSelfie::new_in(42, Box::pin, |value| value);
+
+    assert_eq!(42, *data.owned());
+    assert_eq!(42, **data.referential());
+    assert!(::core::ptr::eq(data.owned(), *data.referential()));
+
+    // Moving obviously can't do much here, but still
+    let data = Box::new(data);
+    assert_eq!(42, *data.owned());
+    assert_eq!(42, **data.referential());
+    assert!(::core::ptr::eq(data.owned(), *data.referential()));
 
     drop(data);
 }
