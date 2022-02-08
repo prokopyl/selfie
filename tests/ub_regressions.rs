@@ -1,3 +1,5 @@
+#![cfg(feature = "stable_deref_trait")]
+
 use selfie::refs::{Mut, Ref};
 use selfie::{Selfie, SelfieMut};
 use std::cell::Cell;

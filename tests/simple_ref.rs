@@ -1,7 +1,8 @@
+#![cfg(feature = "stable_deref_trait")]
+
 use selfie::refs::{Ref, RefType};
-use selfie::{PinnedSelfie, Selfie, SelfieMut};
+use selfie::{Selfie, SelfieMut};
 use std::cell::RefCell;
-use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::Arc;
 
@@ -119,24 +120,6 @@ pub fn drops() {
     drop(data);
 }
 
-#[test]
-pub fn pinned() {
-    let data: Pin<Box<PinnedSelfie<i32, Ref<i32>>>> =
-        PinnedSelfie::new_in(42, Box::pin, |value| value);
-
-    assert_eq!(42, *data.owned());
-    assert_eq!(42, **data.referential());
-    assert!(::core::ptr::eq(data.owned(), *data.referential()));
-
-    // Moving obviously can't do much here, but still
-    let data = Box::new(data);
-    assert_eq!(42, *data.owned());
-    assert_eq!(42, **data.referential());
-    assert!(::core::ptr::eq(data.owned(), *data.referential()));
-
-    drop(data);
-}
-
 fn all_but_first_char(x: &RefCell<String>) -> Selfie<::core::cell::Ref<String>, Ref<str>> {
     let x = Pin::new(x.borrow());
     Selfie::new(x, |s| &s[1..])
@@ -152,25 +135,4 @@ pub fn refcell() {
     drop(selfie);
 
     assert!(refcell.try_borrow_mut().is_ok());
-}
-
-struct UnstableInt(pub i32);
-
-impl Deref for UnstableInt {
-    type Target = i32;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-#[test] // FIXME: this should fail
-pub fn unpinned_int() {
-    let int = Pin::new(UnstableInt(42));
-    let data: Selfie<UnstableInt, Ref<i32>> = Selfie::new(int, |i| i);
-
-    assert_eq!(&42, *data.referential());
-
-    let data = Box::new(data);
-    assert_eq!(&42, *data.referential());
 }

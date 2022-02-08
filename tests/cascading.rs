@@ -1,6 +1,7 @@
+#![cfg(feature = "stable_deref_trait")]
+
 use selfie::refs::{Mut, Ref, SelfieRef, SelfieRefMut};
 use selfie::{Selfie, SelfieMut};
-use std::ops::Deref;
 use std::pin::Pin;
 
 #[test]
@@ -68,5 +69,5 @@ pub fn cascading_mut() {
 
     assert_eq!(&b"la", data.referential().referential());
     let my_str = data.into_inner();
-    assert_eq!(b"Hella, world!", &my_str.deref());
+    assert_eq!(b"Hella, world!", &my_str[..]);
 }

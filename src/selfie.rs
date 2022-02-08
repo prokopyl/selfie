@@ -1,8 +1,9 @@
 use crate::refs::*;
 use crate::utils::*;
 use core::fmt::{Debug, Formatter};
-use core::ops::{Deref, DerefMut};
+use core::ops::DerefMut;
 use core::pin::Pin;
+use stable_deref_trait::StableDeref;
 
 pub struct Selfie<'a, P: 'a, R: for<'this> RefType<'this> + ?Sized> {
     // SAFETY: enforce drop order!
@@ -10,7 +11,7 @@ pub struct Selfie<'a, P: 'a, R: for<'this> RefType<'this> + ?Sized> {
     owned: Pin<P>,
 }
 
-impl<'a, P: Deref + 'a, R: for<'this> RefType<'this> + ?Sized> Selfie<'a, P, R> {
+impl<'a, P: StableDeref + 'a, R: for<'this> RefType<'this> + ?Sized> Selfie<'a, P, R> {
     pub fn new(
         owned: Pin<P>,
         handler: for<'this> fn(&'this P::Target) -> <R as RefType<'this>>::Ref,
@@ -42,7 +43,7 @@ impl<'a, P: Deref + 'a, R: for<'this> RefType<'this> + ?Sized> Selfie<'a, P, R> 
     }
 }
 
-impl<'a, P: 'a + Deref, R: for<'this> RefType<'this> + ?Sized> Debug for Selfie<'a, P, R>
+impl<'a, P: 'a + StableDeref, R: for<'this> RefType<'this> + ?Sized> Debug for Selfie<'a, P, R>
 where
     P::Target: Debug,
     <R as RefType<'a>>::Ref: Debug,
@@ -61,7 +62,9 @@ pub struct SelfieMut<'a, P: 'a, R: for<'this> RefType<'this> + ?Sized> {
     pinned: Pin<P>,
 }
 
-impl<'a, P: DerefMut + 'a, R: for<'this> RefType<'this> + ?Sized> SelfieMut<'a, P, R> {
+impl<'a, P: StableDeref + DerefMut + 'a, R: for<'this> RefType<'this> + ?Sized>
+    SelfieMut<'a, P, R>
+{
     #[inline]
     pub fn new(
         mut pinned: Pin<P>,
@@ -97,7 +100,8 @@ impl<'a, P: DerefMut + 'a, R: for<'this> RefType<'this> + ?Sized> SelfieMut<'a, 
     }
 }
 
-impl<'a, P: DerefMut + 'a, R: for<'this> RefType<'this> + ?Sized> Debug for SelfieMut<'a, P, R>
+impl<'a, P: StableDeref + DerefMut + 'a, R: for<'this> RefType<'this> + ?Sized> Debug
+    for SelfieMut<'a, P, R>
 where
     <R as RefType<'a>>::Ref: Debug,
 {

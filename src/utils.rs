@@ -1,7 +1,8 @@
-use core::pin::Pin;
-
 #[inline]
-pub unsafe fn detach_lifetime<'this, T: ?Sized>(pin: Pin<&T>) -> Pin<&'this T> {
+#[cfg(feature = "stable_deref_trait")] // Not used anywhere else than Selfie
+pub unsafe fn detach_lifetime<'this, T: ?Sized>(
+    pin: core::pin::Pin<&T>,
+) -> core::pin::Pin<&'this T> {
     // SAFETY: wa are transmuting between the exact same types, except for the lifetimes, which
     // invariants are upheld by the caller
     ::core::mem::transmute(pin)
@@ -9,7 +10,10 @@ pub unsafe fn detach_lifetime<'this, T: ?Sized>(pin: Pin<&T>) -> Pin<&'this T> {
 
 /// Same as detach_borrow but mut
 #[inline]
-pub unsafe fn detach_lifetime_mut<'this, T: ?Sized>(pin: Pin<&mut T>) -> Pin<&'this mut T> {
+#[cfg(feature = "stable_deref_trait")] // Not used anywhere else than Selfie
+pub unsafe fn detach_lifetime_mut<'this, T: ?Sized>(
+    pin: core::pin::Pin<&mut T>,
+) -> core::pin::Pin<&'this mut T> {
     // SAFETY: same as detach_borrow but mut
     ::core::mem::transmute(pin)
 }
