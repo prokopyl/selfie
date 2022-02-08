@@ -1,5 +1,6 @@
 use crate::refs::*;
 use crate::utils::detach_lifetime_ref;
+use core::fmt::{Debug, Formatter};
 use core::marker::PhantomPinned;
 use core::mem::MaybeUninit;
 use core::ops::DerefMut;
@@ -71,5 +72,18 @@ impl<'a, T: 'a + Unpin, R: for<'this> RefType<'this> + ?Sized + 'a> PinnedSelfie
 
         // SAFETY: T is Unpin, and PinnedSelfie without the referential is inherently Unpin as well
         unsafe { Pin::into_inner_unchecked(this) }.into().owned
+    }
+}
+
+impl<'a, T: 'a + Debug + Unpin, R: for<'this> RefType<'this> + ?Sized + 'a> Debug
+    for PinnedSelfie<'a, T, R>
+where
+    <R as RefType<'a>>::Ref: Debug,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("PinnedSelfie")
+            .field("owned", &self.owned())
+            .field("reference", self.referential())
+            .finish()
     }
 }
