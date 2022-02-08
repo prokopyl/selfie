@@ -5,6 +5,7 @@ use stable_deref_trait::StableDeref;
 pub unsafe trait StableOwned<T>: Sized + Deref<Target = T> + StableDeref {
     fn new_pinned(data: T) -> Pin<Self>;
     fn pin_as_mut(pin: &mut Pin<Self>) -> Pin<&mut T>;
+    fn unwrap(self) -> T;
 }
 
 #[cfg(any(feature = "std", feature = "alloc"))]
@@ -26,6 +27,11 @@ const _: () = {
         fn pin_as_mut(pin: &mut Pin<Self>) -> Pin<&mut T> {
             Pin::as_mut(pin)
         }
+
+        #[inline]
+        fn unwrap(self) -> T {
+            *self
+        }
     }
 
     unsafe impl<T> StableOwned<T> for Rc<T> {
@@ -38,6 +44,14 @@ const _: () = {
         fn pin_as_mut(pin: &mut Pin<Self>) -> Pin<&mut T> {
             rc_get_pin_mut(pin).unwrap()
         }
+
+        #[inline]
+        fn unwrap(self) -> T {
+            match Rc::try_unwrap(self) {
+                Ok(value) => value,
+                Err(_) => panic!("Failed to unwrap: Rc is still shared"),
+            }
+        }
     }
 
     unsafe impl<T> StableOwned<T> for Arc<T> {
@@ -49,6 +63,14 @@ const _: () = {
         #[inline]
         fn pin_as_mut(pin: &mut Pin<Self>) -> Pin<&mut T> {
             arc_get_pin_mut(pin).unwrap()
+        }
+
+        #[inline]
+        fn unwrap(self) -> T {
+            match Arc::try_unwrap(self) {
+                Ok(value) => value,
+                Err(_) => panic!("Failed to unwrap: Arc is still shared"),
+            }
         }
     }
 
