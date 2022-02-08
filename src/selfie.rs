@@ -7,31 +7,28 @@ use core::pin::Pin;
 pub struct Selfie<'a, P: 'a, R: for<'this> RefType<'this> + ?Sized> {
     // SAFETY: enforce drop order!
     referential: <R as RefType<'a>>::Ref,
-    pinned: Pin<P>,
+    owned: Pin<P>,
 }
 
 impl<'a, P: Deref + 'a, R: for<'this> RefType<'this> + ?Sized> Selfie<'a, P, R> {
     pub fn new(
-        pinned: Pin<P>,
+        owned: Pin<P>,
         handler: for<'this> fn(&'this P::Target) -> <R as RefType<'this>>::Ref,
     ) -> Self
     where
         P::Target: 'a,
     {
         // SAFETY: derefd is pinned and cannot move, and this struct guarantees its lifetime
-        let derefd = unsafe { detach_lifetime(pinned.as_ref()) }.get_ref();
+        let derefd = unsafe { detach_lifetime(owned.as_ref()) }.get_ref();
 
         let referential = handler(derefd);
 
-        Self {
-            referential,
-            pinned,
-        }
+        Self { referential, owned }
     }
 
     #[inline]
     pub fn owned(&self) -> &P::Target {
-        self.pinned.as_ref().get_ref()
+        self.owned.as_ref().get_ref()
     }
 
     #[inline]
@@ -41,7 +38,7 @@ impl<'a, P: Deref + 'a, R: for<'this> RefType<'this> + ?Sized> Selfie<'a, P, R> 
 
     #[inline]
     pub fn into_inner(self) -> Pin<P> {
-        self.pinned
+        self.owned
     }
 }
 
@@ -53,7 +50,7 @@ where
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("Selfie")
             .field("owned", &self.owned())
-            .field("reference", self.referential())
+            .field("referential", self.referential())
             .finish()
     }
 }
@@ -106,7 +103,7 @@ where
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("SelfieMut")
-            .field("reference", self.referential())
+            .field("referential", self.referential())
             .finish()
     }
 }

@@ -1,6 +1,7 @@
 use selfie::refs::{Ref, RefType};
 use selfie::{PinnedSelfie, Selfie, SelfieMut};
 use std::cell::RefCell;
+use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::Arc;
 
@@ -20,8 +21,8 @@ pub fn simple_int() {
 
 #[test]
 pub fn simple_str() {
-    let my_str = Pin::new("Hello, world!".to_owned().into_boxed_str());
-    let data: Selfie<Box<str>, Ref<str>> = Selfie::new(my_str, |i| &i[0..5]);
+    let my_str = Pin::new("Hello, world!".to_owned());
+    let data: Selfie<String, Ref<str>> = Selfie::new(my_str, |i| &i[0..5]);
 
     assert_eq!("Hello, world!", data.owned());
     assert_eq!(&"Hello", data.referential());
@@ -136,7 +137,6 @@ pub fn pinned() {
     drop(data);
 }
 
-// nontrivial example
 fn all_but_first_char(x: &RefCell<String>) -> Selfie<::core::cell::Ref<String>, Ref<str>> {
     let x = Pin::new(x.borrow());
     Selfie::new(x, |s| &s[1..])
@@ -152,4 +152,25 @@ pub fn refcell() {
     drop(selfie);
 
     assert!(refcell.try_borrow_mut().is_ok());
+}
+
+struct UnstableInt(pub i32);
+
+impl Deref for UnstableInt {
+    type Target = i32;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[test] // FIXME: this should fail
+pub fn unpinned_int() {
+    let int = Pin::new(UnstableInt(42));
+    let data: Selfie<UnstableInt, Ref<i32>> = Selfie::new(int, |i| i);
+
+    assert_eq!(&42, *data.referential());
+
+    let data = Box::new(data);
+    assert_eq!(&42, *data.referential());
 }
