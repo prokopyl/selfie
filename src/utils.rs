@@ -1,5 +1,4 @@
 #[inline]
-#[cfg(feature = "stable_deref_trait")] // Not used anywhere else than Selfie
 pub unsafe fn detach_lifetime<'this, T: ?Sized>(
     pin: core::pin::Pin<&T>,
 ) -> core::pin::Pin<&'this T> {
@@ -10,7 +9,6 @@ pub unsafe fn detach_lifetime<'this, T: ?Sized>(
 
 /// Same as detach_borrow but mut
 #[inline]
-#[cfg(feature = "stable_deref_trait")] // Not used anywhere else than Selfie
 pub unsafe fn detach_lifetime_mut<'this, T: ?Sized>(
     pin: core::pin::Pin<&mut T>,
 ) -> core::pin::Pin<&'this mut T> {

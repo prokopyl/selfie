@@ -19,7 +19,7 @@ impl<'a, P: StableDeref + 'a, R: for<'this> RefType<'this> + ?Sized> Selfie<'a, 
     where
         P::Target: 'a,
     {
-        // SAFETY: derefd is pinned and cannot move, and this struct guarantees its lifetime
+        // SAFETY: This type does not expose anything that could expose referential longer than owned exists
         let derefd = unsafe { detach_lifetime(owned.as_ref()) }.get_ref();
 
         let referential = handler(derefd);
@@ -73,7 +73,7 @@ impl<'a, P: StableDeref + DerefMut + 'a, R: for<'this> RefType<'this> + ?Sized>
     where
         P::Target: 'a,
     {
-        // SAFETY: derefd is pinned and cannot move, and this struct guarantees its lifetime
+        // SAFETY: This type does not expose anything that could expose referential longer than owned exists
         let derefd = unsafe { detach_lifetime_mut(pinned.as_mut()) };
 
         let referential = handler(derefd);

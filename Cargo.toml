@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-stable_deref_trait = { version = "1.2.0", default-features = false, optional = true }
+stable_deref_trait = { version = "1.2.0", default-features = false }
 
 [features]
 "alloc" = ["stable_deref_trait/alloc"]

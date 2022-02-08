@@ -20,8 +20,7 @@ impl<T> DerefMut for UnstableBox<T> {
 }
 
 pub fn main() {
-    let data: Pin<UnstableBox<PinnedSelfie<i32, Ref<i32>>>> =
-        PinnedSelfie::new_in(42, |v| Pin::new(UnstableBox(v)), |value| value);
+    let data: Pin<UnstableBox<PinnedSelfie<i32, Ref<i32>>>> = PinnedSelfie::new(42, |value| value);
 
     assert_eq!(42, *data.owned());
     assert_eq!(42, **data.referential());
