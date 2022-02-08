@@ -1,0 +1,15 @@
+error[E0277]: `PhantomPinned` cannot be unpinned
+   --> tests/compile_fail/unstable_deref_pinned.rs:24:47
+    |
+24  |         PinnedSelfie::new_in(42, |v| Pin::new(UnstableBox(v)), |value| value);
+    |                                      -------- ^^^^^^^^^^^^^^ within `PinnedSelfie<'_, {integer}, _>`, the trait `Unpin` is not implemented for `PhantomPinned`
+    |                                      |
+    |                                      required by a bound introduced by this call
+    |
+    = note: consider using `Box::pin`
+    = note: required because it appears within the type `PinnedSelfie<'_, {integer}, _>`
+note: required by a bound in `Pin::<P>::new`
+   --> $RUST/core/src/pin.rs
+    |
+    | impl<P: Deref<Target: Unpin>> Pin<P> {
+    |                       ^^^^^ required by this bound in `Pin::<P>::new`

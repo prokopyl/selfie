@@ -27,7 +27,7 @@ impl<'a, T: 'a + Unpin, R: for<'this> RefType<'this> + ?Sized + 'a> PinnedSelfie
     pub fn new_in_with<P: 'a, F: FnOnce(Self) -> Pin<P>>(
         owned: T,
         pinner: F,
-        as_mut: fn(&mut Pin<P>) -> Pin<&mut Self>,
+        as_mut: fn(&mut Pin<P>) -> Pin<&mut Self>, // FIXME: to check, maybe this could be used to hold multiple compatible Selfies and return the wrong one
         handler: for<'this> fn(&'this T) -> <R as RefType<'this>>::Ref,
     ) -> Pin<P> {
         let this = Self {
