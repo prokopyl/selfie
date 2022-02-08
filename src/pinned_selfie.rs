@@ -1,33 +1,38 @@
 use crate::refs::*;
+use crate::utils::detach_lifetime_ref;
+use core::marker::PhantomPinned;
 use core::mem::MaybeUninit;
 use core::ops::DerefMut;
 use core::pin::Pin;
 
-pub struct PinnedSelfie<T, R: for<'a> RefType<'a> + ?Sized> {
-    referential: MaybeUninit<<R as RefType<'static>>::Ref>,
+pub struct PinnedSelfie<'a, T: 'a, R: for<'this> RefType<'this> + ?Sized> {
+    referential: MaybeUninit<<R as RefType<'a>>::Ref>,
     owned: T,
+    _pinned: PhantomPinned,
 }
 
-impl<T: 'static + Unpin, R: for<'a> RefType<'a> + ?Sized> PinnedSelfie<T, R> {
+impl<'a, T: 'a + Unpin, R: for<'this> RefType<'this> + ?Sized + 'a> PinnedSelfie<'a, T, R> {
     #[inline]
-    pub fn new_in<P: DerefMut<Target = Self>, F: FnOnce(Self) -> Pin<P>>(
+    pub fn new_in<P: 'a + DerefMut<Target = Self>, F: FnOnce(Self) -> Pin<P>>(
         owned: T,
         pinner: F,
-        handler: for<'a> fn(&'a T) -> <R as RefType<'a>>::Ref,
+        handler: for<'this> fn(&'this T) -> <R as RefType<'this>>::Ref,
     ) -> Pin<P> {
-        Self::new_in_with(owned, pinner, |p| p.as_mut(), handler)
+        Self::new_in_with(owned, pinner, Pin::as_mut, handler)
     }
 
     // TODO: bikeshed
-    pub fn new_in_with<P, F: FnOnce(Self) -> Pin<P>, FM: FnOnce(&mut Pin<P>) -> Pin<&mut Self>>(
+    #[inline]
+    pub fn new_in_with<P: 'a, F: FnOnce(Self) -> Pin<P>>(
         owned: T,
         pinner: F,
-        as_mut: FM,
-        handler: for<'a> fn(&'a T) -> <R as RefType<'a>>::Ref,
+        as_mut: fn(&mut Pin<P>) -> Pin<&mut Self>,
+        handler: for<'this> fn(&'this T) -> <R as RefType<'this>>::Ref,
     ) -> Pin<P> {
         let this = Self {
             owned,
             referential: MaybeUninit::uninit(),
+            _pinned: PhantomPinned,
         };
 
         let mut pinned = pinner(this);
@@ -35,7 +40,7 @@ impl<T: 'static + Unpin, R: for<'a> RefType<'a> + ?Sized> PinnedSelfie<T, R> {
         // SAFETY: we are not moving owned, only initializing referential
         let pinned_mut: &mut Self = unsafe { Pin::get_unchecked_mut(as_mut(&mut pinned)) };
         // SAFETY: owned is pinned and cannot move, and this struct guarantees its lifetime
-        let referential = handler(unsafe { &*(&pinned_mut.owned as *const _) });
+        let referential = handler(unsafe { detach_lifetime_ref(&pinned_mut.owned) });
 
         pinned_mut.referential.write(referential);
 
@@ -48,9 +53,10 @@ impl<T: 'static + Unpin, R: for<'a> RefType<'a> + ?Sized> PinnedSelfie<T, R> {
     }
 
     #[inline]
-    pub fn referential(&self) -> &<R as RefType>::Ref {
-        // TODO: check this is actually safe
-        unsafe { ::core::mem::transmute(&self.referential) }
+    pub fn referential(&self) -> &<R as RefType<'a>>::Ref {
+        // SAFETY: referential was initialized in new_in_with
+        // There is no safe way to get a PinnedSelfie without completing new_in_with
+        unsafe { self.referential.assume_init_ref() }
     }
 
     #[inline]
@@ -63,7 +69,7 @@ impl<T: 'static + Unpin, R: for<'a> RefType<'a> + ?Sized> PinnedSelfie<T, R> {
         // never accessed again after this, and is guaranteed to be intialized by the constructor
         unsafe { ::core::ptr::drop_in_place(selfie.referential.as_mut_ptr()) };
 
-        // SAFETY: T is Unpin, and PinnedSelfie without referential is inherently Unpin as well
+        // SAFETY: T is Unpin, and PinnedSelfie without the referential is inherently Unpin as well
         unsafe { Pin::into_inner_unchecked(this) }.into().owned
     }
 }

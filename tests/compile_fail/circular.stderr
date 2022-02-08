@@ -1,0 +1,11 @@
+error[E0502]: cannot borrow `selfie` as mutable because it is also borrowed as immutable
+  --> tests/compile_fail/circular.rs:22:15
+   |
+20 |     selfie.referential().0.borrow_mut().0 = Some(selfie.referential());
+   |                                                  -------------------- immutable borrow occurs here
+21 |
+22 |     let dep = selfie.referential_mut();
+   |               ^^^^^^^---------------^^
+   |               |      |
+   |               |      immutable borrow later used by call
+   |               mutable borrow occurs here

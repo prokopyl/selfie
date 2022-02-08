@@ -1,5 +1,6 @@
 use selfie::refs::{Ref, RefType};
 use selfie::{PinnedSelfie, Selfie, SelfieMut};
+use std::cell::RefCell;
 use std::pin::Pin;
 use std::sync::Arc;
 
@@ -133,4 +134,22 @@ pub fn pinned() {
     assert!(::core::ptr::eq(data.owned(), *data.referential()));
 
     drop(data);
+}
+
+// nontrivial example
+fn all_but_first_char(x: &RefCell<String>) -> Selfie<::core::cell::Ref<String>, Ref<str>> {
+    let x = Pin::new(x.borrow());
+    Selfie::new(x, |s| &s[1..])
+}
+
+#[test]
+pub fn refcell() {
+    let refcell = RefCell::new("Hello, world!".to_owned());
+
+    let selfie = all_but_first_char(&refcell);
+    assert!(refcell.try_borrow_mut().is_err());
+    assert_eq!("ello, world!", *selfie.referential());
+    drop(selfie);
+
+    assert!(refcell.try_borrow_mut().is_ok());
 }

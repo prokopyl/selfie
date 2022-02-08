@@ -3,22 +3,22 @@ use crate::utils::*;
 use core::ops::{Deref, DerefMut};
 use core::pin::Pin;
 
-pub struct Selfie<P, R: for<'a> RefType<'a> + ?Sized> {
+pub struct Selfie<'a, P: 'a, R: for<'this> RefType<'this> + ?Sized> {
     // SAFETY: enforce drop order!
-    referential: <R as RefType<'static>>::Ref,
+    referential: <R as RefType<'a>>::Ref,
     pinned: Pin<P>,
 }
 
-impl<P: Deref, R: for<'a> RefType<'a> + ?Sized> Selfie<P, R> {
+impl<'a, P: Deref + 'a, R: for<'this> RefType<'this> + ?Sized> Selfie<'a, P, R> {
     pub fn new(
         pinned: Pin<P>,
-        handler: for<'a> fn(&'a P::Target) -> <R as RefType<'a>>::Ref,
+        handler: for<'this> fn(&'this P::Target) -> <R as RefType<'this>>::Ref,
     ) -> Self
     where
-        P::Target: 'static, // TODO
+        P::Target: 'a,
     {
         // SAFETY: derefd is pinned and cannot move, and this struct guarantees its lifetime
-        let derefd = unsafe { transmute_pin(pinned.as_ref()) }.get_ref();
+        let derefd = unsafe { detach_lifetime(pinned.as_ref()) }.get_ref();
 
         let referential = handler(derefd);
 
@@ -34,9 +34,8 @@ impl<P: Deref, R: for<'a> RefType<'a> + ?Sized> Selfie<P, R> {
     }
 
     #[inline]
-    pub fn referential(&self) -> &<R as RefType>::Ref {
-        // TODO: check this is actually safe
-        unsafe { ::core::mem::transmute(&self.referential) }
+    pub fn referential(&self) -> &<R as RefType<'a>>::Ref {
+        &self.referential
     }
 
     #[inline]
@@ -45,22 +44,23 @@ impl<P: Deref, R: for<'a> RefType<'a> + ?Sized> Selfie<P, R> {
     }
 }
 
-pub struct SelfieMut<P, R: for<'a> RefType<'a> + ?Sized> {
+pub struct SelfieMut<'a, P: 'a, R: for<'this> RefType<'this> + ?Sized> {
     // SAFETY: enforce drop order!
-    referential: <R as RefType<'static>>::Ref,
+    referential: <R as RefType<'a>>::Ref,
     pinned: Pin<P>,
 }
 
-impl<P: DerefMut, R: for<'a> RefType<'a> + ?Sized> SelfieMut<P, R> {
+impl<'a, P: DerefMut + 'a, R: for<'this> RefType<'this> + ?Sized> SelfieMut<'a, P, R> {
+    #[inline]
     pub fn new(
         mut pinned: Pin<P>,
-        handler: for<'a> fn(Pin<&'a mut P::Target>) -> <R as RefType<'a>>::Ref,
+        handler: for<'this> fn(Pin<&'this mut P::Target>) -> <R as RefType<'this>>::Ref,
     ) -> Self
     where
-        P::Target: 'static, // TODO
+        P::Target: 'a,
     {
         // SAFETY: derefd is pinned and cannot move, and this struct guarantees its lifetime
-        let derefd = unsafe { transmute_pin_mut(pinned.as_mut()) };
+        let derefd = unsafe { detach_lifetime_mut(pinned.as_mut()) };
 
         let referential = handler(derefd);
 
@@ -70,14 +70,14 @@ impl<P: DerefMut, R: for<'a> RefType<'a> + ?Sized> SelfieMut<P, R> {
         }
     }
 
-    pub fn referential(&self) -> &<R as RefType>::Ref {
-        // TODO: check this is actually safe
-        unsafe { ::core::mem::transmute(&self.referential) }
+    #[inline]
+    pub fn referential(&self) -> &<R as RefType<'a>>::Ref {
+        &self.referential
     }
 
-    pub fn referential_mut(&mut self) -> &mut <R as RefType>::Ref {
-        // TODO: check this is actually safe
-        unsafe { ::core::mem::transmute(&mut self.referential) }
+    #[inline]
+    pub fn referential_mut(&mut self) -> &mut <R as RefType<'a>>::Ref {
+        &mut self.referential
     }
 
     #[inline]
