@@ -1,14 +1,12 @@
 use crate::refs::*;
-use crate::utils::*;
+use crate::unsafe_selfie::UnsafeSelfie;
 use core::fmt::{Debug, Formatter};
 use core::ops::DerefMut;
 use core::pin::Pin;
 use stable_deref_trait::StableDeref;
 
 pub struct Selfie<'a, P: 'a, R: for<'this> RefType<'this> + ?Sized> {
-    // SAFETY: enforce drop order!
-    referential: <R as RefType<'a>>::Ref,
-    owned: Pin<P>,
+    inner: UnsafeSelfie<'a, P, R>,
 }
 
 impl<'a, P: StableDeref + 'a, R: for<'this> RefType<'this> + ?Sized> Selfie<'a, P, R> {
@@ -19,27 +17,25 @@ impl<'a, P: StableDeref + 'a, R: for<'this> RefType<'this> + ?Sized> Selfie<'a, 
     where
         P::Target: 'a,
     {
-        // SAFETY: This type does not expose anything that could expose referential longer than owned exists
-        let derefd = unsafe { detach_lifetime(owned.as_ref()) }.get_ref();
-
-        let referential = handler(derefd);
-
-        Self { referential, owned }
+        Self {
+            inner: UnsafeSelfie::new_ref(owned, handler),
+        }
     }
 
     #[inline]
     pub fn owned(&self) -> &P::Target {
-        self.owned.as_ref().get_ref()
+        // SAFETY: referential has been created using a shared reference
+        unsafe { self.inner.owned() }
     }
 
     #[inline]
     pub fn referential(&self) -> &<R as RefType<'a>>::Ref {
-        &self.referential
+        self.inner.referential()
     }
 
     #[inline]
     pub fn into_inner(self) -> Pin<P> {
-        self.owned
+        self.inner.into_inner()
     }
 }
 
@@ -57,9 +53,7 @@ where
 }
 
 pub struct SelfieMut<'a, P: 'a, R: for<'this> RefType<'this> + ?Sized> {
-    // SAFETY: enforce drop order!
-    referential: <R as RefType<'a>>::Ref,
-    pinned: Pin<P>,
+    inner: UnsafeSelfie<'a, P, R>,
 }
 
 impl<'a, P: StableDeref + DerefMut + 'a, R: for<'this> RefType<'this> + ?Sized>
@@ -67,36 +61,31 @@ impl<'a, P: StableDeref + DerefMut + 'a, R: for<'this> RefType<'this> + ?Sized>
 {
     #[inline]
     pub fn new(
-        mut pinned: Pin<P>,
+        owned: Pin<P>,
         handler: for<'this> fn(Pin<&'this mut P::Target>) -> <R as RefType<'this>>::Ref,
     ) -> Self
     where
         P::Target: 'a,
     {
-        // SAFETY: This type does not expose anything that could expose referential longer than owned exists
-        let derefd = unsafe { detach_lifetime_mut(pinned.as_mut()) };
-
-        let referential = handler(derefd);
-
         Self {
-            referential,
-            pinned,
+            inner: UnsafeSelfie::new_mut(owned, handler),
         }
     }
 
     #[inline]
     pub fn referential(&self) -> &<R as RefType<'a>>::Ref {
-        &self.referential
+        self.inner.referential()
     }
 
     #[inline]
     pub fn referential_mut(&mut self) -> &mut <R as RefType<'a>>::Ref {
-        &mut self.referential
+        // SAFETY: TODO?
+        unsafe { self.inner.referential_mut() }
     }
 
     #[inline]
     pub fn into_inner(self) -> Pin<P> {
-        self.pinned
+        self.inner.into_inner()
     }
 }
 

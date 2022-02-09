@@ -62,8 +62,7 @@ struct Point<'a> {
 }
 
 impl<'a> Point<'a> {
-    fn new(values: Pin<&'a mut (i32, i32)>) -> Self {
-        let values = Pin::into_inner(values);
+    fn new(values: &'a mut (i32, i32)) -> Self {
         Self {
             x: &mut values.0,
             y: &mut values.1,

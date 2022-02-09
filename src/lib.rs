@@ -11,3 +11,5 @@ pub use pinned_selfie::*;
 
 mod stable_owned;
 pub use stable_owned::*;
+
+pub(crate) mod unsafe_selfie;
