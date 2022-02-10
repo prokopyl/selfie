@@ -20,11 +20,12 @@ impl<'a, P: StableDeref + 'a, R: for<'this> RefType<'this> + ?Sized> Selfie<'a, 
         P::Target: 'a,
     {
         // SAFETY: This type does not expose anything that could expose referential longer than owned exists
-        let derefd = unsafe { detach_lifetime(owned.as_ref()) }.get_ref();
+        let detached = unsafe { detach_lifetime(owned.as_ref()) }.get_ref();
 
-        let referential = handler(derefd);
-
-        Self { referential, owned }
+        Self {
+            referential: handler(detached),
+            owned,
+        }
     }
 
     #[inline]
@@ -79,12 +80,10 @@ impl<'a, P: StableDeref + DerefMut + 'a, R: for<'this> RefType<'this> + ?Sized>
         P::Target: 'a,
     {
         // SAFETY: This type does not expose anything that could expose referential longer than owned exists
-        let derefd = unsafe { detach_lifetime_mut(pinned.as_mut()) };
-
-        let referential = handler(derefd);
+        let detached = unsafe { detach_lifetime_mut(pinned.as_mut()) };
 
         Self {
-            referential,
+            referential: handler(detached),
             pinned,
         }
     }
