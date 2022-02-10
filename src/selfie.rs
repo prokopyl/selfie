@@ -38,6 +38,11 @@ impl<'a, P: StableDeref + 'a, R: for<'this> RefType<'this> + ?Sized> Selfie<'a, 
     }
 
     #[inline]
+    pub fn referential_mut(&mut self) -> &mut <R as RefType<'a>>::Ref {
+        &mut self.referential
+    }
+
+    #[inline]
     pub fn into_inner(self) -> Pin<P> {
         self.owned
     }

@@ -3,11 +3,10 @@ use crate::utils::*;
 use crate::StableOwned;
 use core::fmt::{Debug, Formatter};
 use core::marker::PhantomPinned;
-use core::mem::MaybeUninit;
 use core::pin::Pin;
 
 pub struct PinnedSelfie<'a, T: 'a, R: for<'this> RefType<'this> + ?Sized> {
-    referential: MaybeUninit<<R as RefType<'a>>::Ref>,
+    referential: Option<<R as RefType<'a>>::Ref>,
     owned: T,
     _pinned: PhantomPinned,
 }
@@ -21,7 +20,7 @@ impl<'a, T: 'a + Unpin, R: for<'this> RefType<'this> + ?Sized + 'a> PinnedSelfie
     ) -> Pin<P> {
         let this = Self {
             owned,
-            referential: MaybeUninit::uninit(),
+            referential: None,
             _pinned: PhantomPinned,
         };
 
@@ -32,7 +31,7 @@ impl<'a, T: 'a + Unpin, R: for<'this> RefType<'this> + ?Sized + 'a> PinnedSelfie
         // SAFETY: This type does not expose anything that could expose referential longer than owned exists
         let referential = handler(unsafe { detach_lifetime_ref(&pinned_mut.owned) });
 
-        pinned_mut.referential.write(referential);
+        pinned_mut.referential = Some(referential);
 
         pinned
     }
@@ -44,23 +43,13 @@ impl<'a, T: 'a + Unpin, R: for<'this> RefType<'this> + ?Sized + 'a> PinnedSelfie
 
     #[inline]
     pub fn referential(&self) -> &<R as RefType<'a>>::Ref {
-        // SAFETY: referential was initialized in new_in_with
-        // There is no safe way to get a PinnedSelfie without completing new
-        unsafe { self.referential.assume_init_ref() }
+        self.referential.as_ref().unwrap()
     }
 
     #[inline]
-    pub fn into_inner<P: StableOwned<Self>>(mut this: Pin<P>) -> T {
-        // First, deallocate the referential before moving anything out
-        // SAFETY: we are not moving anything… yet
-        let selfie: &mut Self = unsafe { Pin::get_unchecked_mut(P::pin_as_mut(&mut this)) };
-
-        // SAFETY: this essentially takes Self therefore can only be called once. Referential is
-        // never accessed again after this, and is guaranteed to be initialized by the constructor
-        unsafe { ::core::ptr::drop_in_place(selfie.referential.as_mut_ptr()) };
-
-        // SAFETY: T is Unpin, and PinnedSelfie without the referential is inherently Unpin as well
-        P::unwrap(unsafe { Pin::into_inner_unchecked(this) }).owned // TODO: check in case of panic
+    pub fn referential_mut(self: Pin<&mut Self>) -> &mut <R as RefType<'a>>::Ref {
+        // SAFETY: the referential type is not structural for this
+        unsafe { self.get_unchecked_mut().referential.as_mut().unwrap() }
     }
 }
 
@@ -77,15 +66,8 @@ where
     }
 }
 
-impl<'a, T: 'a, R: for<'this> RefType<'this> + ?Sized> Drop for PinnedSelfie<'a, T, R> {
-    fn drop(&mut self) {
-        // SAFETY: TODO
-        unsafe { ::core::ptr::drop_in_place(self.referential.as_mut_ptr()) };
-    }
-}
-
 pub struct PinnedSelfieMut<'a, T: 'a, R: for<'this> RefType<'this> + ?Sized> {
-    referential: MaybeUninit<<R as RefType<'a>>::Ref>,
+    referential: Option<<R as RefType<'a>>::Ref>,
     owned: T,
     _pinned: PhantomPinned,
 }
@@ -99,7 +81,7 @@ impl<'a, T: 'a + Unpin, R: for<'this> RefType<'this> + ?Sized + 'a> PinnedSelfie
     ) -> Pin<P> {
         let this = Self {
             owned,
-            referential: MaybeUninit::uninit(),
+            referential: None,
             _pinned: PhantomPinned,
         };
 
@@ -112,38 +94,20 @@ impl<'a, T: 'a + Unpin, R: for<'this> RefType<'this> + ?Sized + 'a> PinnedSelfie
 
         // SAFETY: This type does not expose anything that could expose referential longer than owned exists
         let referential = handler(unsafe { detach_lifetime_ref_mut(pinned_owned) });
-        pinned_referential.write(referential);
+        *pinned_referential = Some(referential);
 
         pinned
     }
 
     #[inline]
     pub fn referential(&self) -> &<R as RefType<'a>>::Ref {
-        // SAFETY: referential was initialized in new_in_with
-        // There is no safe way to get a PinnedSelfie without completing new_in_with
-        unsafe { self.referential.assume_init_ref() }
+        self.referential.as_ref().unwrap()
     }
 
     #[inline]
     pub fn referential_mut(self: Pin<&mut Self>) -> &mut <R as RefType<'a>>::Ref {
-        // SAFETY: the referential type is not structural for PinnedSelfieMut
-        // SAFETY: referential was initialized in new_in_with
-        // There is no safe way to get a PinnedSelfie without completing new
-        unsafe { self.get_unchecked_mut().referential.assume_init_mut() }
-    }
-
-    #[inline]
-    pub fn into_inner<P: StableOwned<Self>>(mut this: Pin<P>) -> T {
-        // First, deallocate the referential before moving anything out
-        // SAFETY: we are not moving anything… yet
-        let selfie: &mut Self = unsafe { Pin::get_unchecked_mut(P::pin_as_mut(&mut this)) };
-
-        // SAFETY: this essentially takes Self therefore can only be called once. Referential is
-        // never accessed again after this, and is guaranteed to be initialized by the constructor
-        unsafe { ::core::ptr::drop_in_place(selfie.referential.as_mut_ptr()) };
-
-        // SAFETY: T is Unpin, and PinnedSelfie without the referential is inherently Unpin as well
-        P::unwrap(unsafe { Pin::into_inner_unchecked(this) }).owned // TODO: check in case of panic
+        // SAFETY: the referential type is not structural for this
+        unsafe { self.get_unchecked_mut().referential.as_mut().unwrap() }
     }
 }
 
@@ -156,12 +120,5 @@ where
         f.debug_struct("PinnedSelfieMut")
             .field("reference", self.referential())
             .finish()
-    }
-}
-
-impl<'a, T: 'a, R: for<'this> RefType<'this> + ?Sized> Drop for PinnedSelfieMut<'a, T, R> {
-    fn drop(&mut self) {
-        // SAFETY: TODO
-        unsafe { ::core::ptr::drop_in_place(self.referential.as_mut_ptr()) };
     }
 }

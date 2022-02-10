@@ -7,10 +7,11 @@ use std::sync::Arc;
 
 #[test]
 pub fn pinned() {
-    let data: Pin<Box<PinnedSelfie<i32, Ref<i32>>>> = PinnedSelfie::new(42, |value| value);
+    let mut data: Pin<Box<PinnedSelfie<i32, Ref<i32>>>> = PinnedSelfie::new(42, |value| value);
 
     assert_eq!(42, *data.owned());
     assert_eq!(42, **data.referential());
+    assert_eq!(42, **data.as_mut().referential_mut());
     assert!(::core::ptr::eq(data.owned(), *data.referential()));
 
     // Moving obviously can't do much here, but still
@@ -75,7 +76,7 @@ impl<'a> RefType<'a> for PointMut {
     type Ref = Point<'a>;
 }
 
-#[test]
+/*#[test]
 pub fn pinned_mut() {
     let mut data: Pin<Box<PinnedSelfieMut<(i32, i32), PointMut>>> =
         PinnedSelfieMut::new((0, 42), |value| Point::new(value));
@@ -93,7 +94,7 @@ pub fn pinned_mut() {
     *data.as_mut().as_mut().referential_mut().x = 12;
     assert_eq!(12, *data.referential().x);
     assert_eq!(42, *data.referential().y);
-}
+}*/
 
 #[derive(Debug)]
 struct DropChecker {
@@ -135,26 +136,6 @@ pub fn pinned_drop() {
 
     // Drop the ref
     drop(dropper);
-
-    assert!(checker.dropped.get());
-}
-
-#[test]
-pub fn pinned_drop_into_inner() {
-    let checker = DropChecker {
-        value: 42,
-        dropped: Cell::new(false),
-    };
-
-    let dropper: Pin<Box<PinnedSelfie<&DropChecker, DropperRef>>> =
-        PinnedSelfie::new(&checker, |value| Dropper { value });
-
-    assert_eq!(42, dropper.referential().value.value);
-    assert_eq!(42, dropper.owned().value);
-    assert!(!dropper.owned().dropped.get());
-
-    // Drop the ref
-    let _ = PinnedSelfie::into_inner(dropper);
 
     assert!(checker.dropped.get());
 }
