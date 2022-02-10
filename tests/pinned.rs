@@ -93,11 +93,9 @@ pub fn pinned_mut() {
     *data.as_mut().as_mut().referential_mut().x = 12;
     assert_eq!(12, *data.referential().x);
     assert_eq!(42, *data.referential().y);
-
-    let data = PinnedSelfieMut::into_inner(*data);
-    assert_eq!((12, 42), data);
 }
 
+#[derive(Debug)]
 struct DropChecker {
     value: u8,
     dropped: Cell<bool>,
@@ -109,6 +107,7 @@ struct Dropper<'a> {
 
 impl<'a> Drop for Dropper<'a> {
     fn drop(&mut self) {
+        assert!(!self.value.dropped.get());
         assert_eq!(42, self.value.value);
         self.value.dropped.set(true);
     }
