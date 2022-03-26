@@ -18,18 +18,28 @@ impl<'a, T: 'a + ?Sized> RefType<'a> for Mut<T> {
 }
 
 // TODO: bikeshed all these
-pub struct SelfieRef<P: ?Sized, R: ?Sized>(PhantomData<P>, PhantomData<R>);
+pub struct SelfieRef<P, R>(PhantomData<P>, PhantomData<R>)
+where
+    P: ?Sized,
+    R: ?Sized;
 
-impl<'a, P: RefType<'a>, R: 'a + for<'this> RefType<'this> + ?Sized> RefType<'a>
-    for SelfieRef<P, R>
+impl<'a, P, R> RefType<'a> for SelfieRef<P, R>
+where
+    P: RefType<'a>,
+    R: 'a + for<'this> RefType<'this> + ?Sized,
 {
     type Ref = Selfie<'a, P::Ref, R>;
 }
 
-pub struct SelfieRefMut<P: ?Sized, R: ?Sized>(PhantomData<P>, PhantomData<R>);
+pub struct SelfieRefMut<P, R>(PhantomData<P>, PhantomData<R>)
+where
+    P: ?Sized,
+    R: ?Sized;
 
-impl<'a, P: RefType<'a>, R: 'a + for<'this> RefType<'this> + ?Sized> RefType<'a>
-    for SelfieRefMut<P, R>
+impl<'a, P, R> RefType<'a> for SelfieRefMut<P, R>
+where
+    P: RefType<'a>,
+    R: 'a + for<'this> RefType<'this> + ?Sized,
 {
     type Ref = SelfieMut<'a, P::Ref, R>;
 }
