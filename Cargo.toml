@@ -1,17 +1,26 @@
 [package]
 name = "selfie"
 version = "0.1.0"
+rust-version = "1.56"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+description = "Experimental, macro-free self-referential structs."
+categories = ["no-std", "rust-patterns"]
+keywords = ["no_std", "self-referential"]
+readme = "README.md"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/prokopyl/selfie"
+
+[badges]
+maintenance = { status = "experimental" }
 
 [dependencies]
 stable_deref_trait = { version = "1.2.0", default-features = false }
 
 [features]
 default = ["std"]
-"alloc" = ["stable_deref_trait/alloc"]
-"std" = ["stable_deref_trait/std"]
+alloc = ["stable_deref_trait/alloc"]
+std = ["stable_deref_trait/std"]
 
 [target.'cfg(not(miri))'.dev-dependencies]
 trybuild = "1.0.55"
