@@ -1,3 +1,5 @@
+#![allow(unsafe_code)] // This module contains slightly-less-unsafe (but still unsafe) helpers.
+
 use crate::refs::RefType;
 
 #[inline]

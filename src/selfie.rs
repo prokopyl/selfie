@@ -1,6 +1,13 @@
+//! This internal module contains the implementation details for Selfie and SelfieMut.
+//!
+//! **Do not make any change here without adding new regression and/or MIRI tests!**
+//!
+//! I do not trust myself in here, and neither should you.
+
+#![allow(unsafe_code)] // I'll be glad to remove this the day self-referential structs can be implemented in Safe Rust
+
 use crate::refs::*;
 use crate::utils::*;
-use core::fmt::{Debug, Formatter};
 use core::ops::DerefMut;
 use core::pin::Pin;
 use stable_deref_trait::StableDeref;
@@ -14,8 +21,6 @@ pub struct Selfie<'a, P: 'a, R: for<'this> RefType<'this> + ?Sized> {
     referential: <R as RefType<'a>>::Ref,
     owned: Pin<P>,
 }
-
-mod safe {}
 
 impl<'a: 'b, 'b: 'a, P: StableDeref + 'a, R: for<'this> RefType<'this> + ?Sized> Selfie<'a, P, R> {
     pub fn new(
@@ -44,7 +49,7 @@ impl<'a: 'b, 'b: 'a, P: StableDeref + 'a, R: for<'this> RefType<'this> + ?Sized>
     where
         F: for<'this> FnOnce(&'this <R as RefType<'s>>::Ref) -> T,
     {
-        // SAFETY: Downcasting is safe here, becasue Ref is actually 's, not 'a
+        // SAFETY: Down-casting is safe here, because Ref is actually 's, not 'a
         let referential = unsafe { downcast_ref::<'s, 'a, R>(&self.referential) };
         handler(referential)
     }
@@ -54,7 +59,7 @@ impl<'a: 'b, 'b: 'a, P: StableDeref + 'a, R: for<'this> RefType<'this> + ?Sized>
     where
         F: for<'this> FnOnce(&'this mut <R as RefType<'s>>::Ref) -> T,
     {
-        // SAFETY: Downcasting is safe here, becasue Ref is actually 's, not 'a
+        // SAFETY: Down-casting is safe here, because Ref is actually 's, not 'a
         let referential = unsafe { downcast_mut::<'s, 'a, R>(&mut self.referential) };
         handler(referential)
     }
@@ -96,7 +101,7 @@ impl<'a, P: StableDeref + DerefMut + 'a, R: for<'this> RefType<'this> + ?Sized>
     where
         F: for<'this> FnOnce(&'this <R as RefType<'s>>::Ref) -> T,
     {
-        // SAFETY: Downcasting is safe here, becasue Ref is actually 's, not 'a
+        // SAFETY: Down-casting is safe here, because Ref is actually 's, not 'a
         let referential = unsafe { downcast_ref::<'s, 'a, R>(&self.referential) };
         handler(referential)
     }
@@ -106,7 +111,7 @@ impl<'a, P: StableDeref + DerefMut + 'a, R: for<'this> RefType<'this> + ?Sized>
     where
         F: for<'this> FnOnce(&'this mut <R as RefType<'s>>::Ref) -> T,
     {
-        // SAFETY: Downcasting is safe here, becasue Ref is actually 's, not 'a
+        // SAFETY: Down-casting is safe here, because Ref is actually 's, not 'a
         let referential = unsafe { downcast_mut::<'s, 'a, R>(&mut self.referential) };
         handler(referential)
     }
@@ -114,19 +119,5 @@ impl<'a, P: StableDeref + DerefMut + 'a, R: for<'this> RefType<'this> + ?Sized>
     #[inline]
     pub fn into_inner(self) -> Pin<P> {
         self.pinned
-    }
-}
-
-impl<'a, P: StableDeref + DerefMut + 'a, R: for<'this> RefType<'this> + ?Sized> Debug
-    for SelfieMut<'a, P, R>
-where
-    for<'this> <R as RefType<'this>>::Ref: Debug,
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        self.with_referential(|referential| {
-            f.debug_struct("Selfie")
-                .field("referential", referential)
-                .finish()
-        })
     }
 }
