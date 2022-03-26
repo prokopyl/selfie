@@ -7,7 +7,7 @@ use std::pin::Pin;
 
 fn helper(owning_ref: Selfie<Box<Cell<u8>>, Ref<Cell<u8>>>) -> u8 {
     owning_ref.owned().set(10);
-    owning_ref.referential().set(20);
+    owning_ref.with_referential(|r| r.set(20));
     owning_ref.owned().get()
 }
 
@@ -20,8 +20,8 @@ fn cell() {
 }
 
 fn helper_mut(owning_ref: SelfieMut<Box<Cell<u8>>, Mut<Cell<u8>>>) -> u8 {
-    owning_ref.referential().set(20);
-    owning_ref.referential().get()
+    owning_ref.with_referential(|r| r.set(20));
+    owning_ref.with_referential(|r| r.get())
 }
 
 #[test]

@@ -9,8 +9,8 @@ error[E0277]: the trait bound `UnstableInt: stable_deref_trait::StableDeref` is 
 note: required by a bound in `Selfie::<'a, P, R>::new`
   --> src/selfie.rs
    |
-   | impl<'a, P: StableDeref + 'a, R: for<'this> RefType<'this> + ?Sized> Selfie<'a, P, R> {
-   |             ^^^^^^^^^^^ required by this bound in `Selfie::<'a, P, R>::new`
+   | impl<'a: 'b, 'b: 'a, P: StableDeref + 'a, R: for<'this> RefType<'this> + ?Sized> Selfie<'a, P, R> {
+   |                         ^^^^^^^^^^^ required by this bound in `Selfie::<'a, P, R>::new`
 help: consider borrowing here
    |
 18 |     let data: Selfie<UnstableInt, Ref<i32>> = Selfie::new(&int, |i| i);
@@ -18,14 +18,14 @@ help: consider borrowing here
 18 |     let data: Selfie<UnstableInt, Ref<i32>> = Selfie::new(&mut int, |i| i);
    |                                                           ++++
 
-error[E0599]: the method `referential` exists for struct `Selfie<'_, UnstableInt, selfie::refs::Ref<i32>>`, but its trait bounds were not satisfied
-   --> tests/compile_fail/unstable_deref.rs:20:27
+error[E0599]: the method `with_referential` exists for struct `Selfie<'_, UnstableInt, selfie::refs::Ref<i32>>`, but its trait bounds were not satisfied
+   --> tests/compile_fail/unstable_deref.rs:20:10
     |
 6   | struct UnstableInt(pub i32);
     | ---------------------------- doesn't satisfy `UnstableInt: stable_deref_trait::StableDeref`
 ...
-20  |     assert_eq!(&42, *data.referential());
-    |                           ^^^^^^^^^^^ private field, not a method
+20  |     data.with_referential(|r| assert_eq!(&42, *r));
+    |          ^^^^^^^^^^^^^^^^ method cannot be called on `Selfie<'_, UnstableInt, selfie::refs::Ref<i32>>` due to unsatisfied trait bounds
     |
     = note: the following trait bounds were not satisfied:
             `UnstableInt: stable_deref_trait::StableDeref`
@@ -35,14 +35,14 @@ note: the following trait must be implemented
     | pub unsafe trait StableDeref: Deref {}
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error[E0599]: the method `referential` exists for struct `Box<Selfie<'_, UnstableInt, selfie::refs::Ref<i32>>>`, but its trait bounds were not satisfied
-   --> tests/compile_fail/unstable_deref.rs:23:27
+error[E0599]: the method `with_referential` exists for struct `Box<Selfie<'_, UnstableInt, selfie::refs::Ref<i32>>>`, but its trait bounds were not satisfied
+   --> tests/compile_fail/unstable_deref.rs:23:10
     |
 6   | struct UnstableInt(pub i32);
     | ---------------------------- doesn't satisfy `UnstableInt: stable_deref_trait::StableDeref`
 ...
-23  |     assert_eq!(&42, *data.referential());
-    |                           ^^^^^^^^^^^ private field, not a method
+23  |     data.with_referential(|r| assert_eq!(&42, *r));
+    |          ^^^^^^^^^^^^^^^^ method cannot be called on `Box<Selfie<'_, UnstableInt, selfie::refs::Ref<i32>>>` due to unsatisfied trait bounds
     |
     = note: the following trait bounds were not satisfied:
             `UnstableInt: stable_deref_trait::StableDeref`

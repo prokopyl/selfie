@@ -9,6 +9,7 @@ edition = "2021"
 stable_deref_trait = { version = "1.2.0", default-features = false }
 
 [features]
+default = ["std"]
 "alloc" = ["stable_deref_trait/alloc"]
 "std" = ["stable_deref_trait/std"]
 

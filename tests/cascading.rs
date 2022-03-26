@@ -11,14 +11,23 @@ pub fn cascading() {
     });
 
     assert_eq!("Hello, world!", data.owned());
-    assert_eq!("Hello", data.referential().owned());
-    assert_eq!(&"lo", data.referential().referential());
+    data.with_referential(|r1| {
+        assert_eq!("Hello", r1.owned());
+        r1.with_referential(|r2| {
+            assert_eq!(&"lo", r2);
+        })
+    });
 
+    // Moving the Selfie has no consequence
     let data = Box::new(data);
 
     assert_eq!("Hello, world!", data.owned());
-    assert_eq!("Hello", data.referential().owned());
-    assert_eq!(&"lo", data.referential().referential());
+    data.with_referential(|r1| {
+        assert_eq!("Hello", r1.owned());
+        r1.with_referential(|r2| {
+            assert_eq!(&"lo", r2);
+        })
+    });
 }
 
 #[test]
@@ -36,16 +45,28 @@ pub fn more_cascading() {
         });
 
     assert_eq!("Hello, world!", data.owned());
-    assert_eq!("Hello", data.referential().owned());
-    assert_eq!("ello", data.referential().referential().owned());
-    assert_eq!(&"lo", data.referential().referential().referential());
+    data.with_referential(|r1| {
+        assert_eq!("Hello", r1.owned());
+        r1.with_referential(|r2| {
+            assert_eq!("ello", r2.owned());
+            r2.with_referential(|r3| {
+                assert_eq!(&"lo", r3);
+            })
+        })
+    });
 
     let data = Box::new(data);
 
     assert_eq!("Hello, world!", data.owned());
-    assert_eq!("Hello", data.referential().owned());
-    assert_eq!("ello", data.referential().referential().owned());
-    assert_eq!(&"lo", data.referential().referential().referential());
+    data.with_referential(|r1| {
+        assert_eq!("Hello", r1.owned());
+        r1.with_referential(|r2| {
+            assert_eq!("ello", r2.owned());
+            r2.with_referential(|r3| {
+                assert_eq!(&"lo", r3);
+            })
+        })
+    });
 }
 
 #[test]
@@ -59,13 +80,12 @@ pub fn cascading_mut() {
             SelfieMut::new(substr, |i| &mut Pin::into_inner(i)[3..])
         });
 
-    assert_eq!(&b"lo", data.referential().referential());
-    data.referential_mut().referential_mut()[1] = b'a';
-    assert_eq!(&b"la", data.referential().referential());
+    data.with_referential(|r1| r1.with_referential(|r2| assert_eq!(&b"lo", r2)));
+    data.with_referential_mut(|r1| r1.with_referential_mut(|r2| r2[1] = b'a'));
+    data.with_referential(|r1| r1.with_referential(|r2| assert_eq!(&b"la", r2)));
 
     let data = Box::new(data);
-
-    assert_eq!(&b"la", data.referential().referential());
+    data.with_referential(|r1| r1.with_referential(|r2| assert_eq!(&b"la", r2)));
     let my_str = data.into_inner();
     assert_eq!(b"Hella, world!", &my_str[..]);
 }

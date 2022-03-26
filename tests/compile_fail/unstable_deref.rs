@@ -17,8 +17,8 @@ pub fn main() {
     let int = Pin::new(UnstableInt(42));
     let data: Selfie<UnstableInt, Ref<i32>> = Selfie::new(int, |i| i);
 
-    assert_eq!(&42, *data.referential());
+    data.with_referential(|r| assert_eq!(&42, *r));
 
     let data = Box::new(data);
-    assert_eq!(&42, *data.referential());
+    data.with_referential(|r| assert_eq!(&42, *r));
 }
