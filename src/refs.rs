@@ -26,7 +26,7 @@ where
 impl<'a, P, R> RefType<'a> for SelfieRef<P, R>
 where
     P: RefType<'a>,
-    R: 'a + for<'this> RefType<'this> + ?Sized,
+    R: 'a + for<'this> RefType<'this>,
 {
     type Ref = Selfie<'a, P::Ref, R>;
 }

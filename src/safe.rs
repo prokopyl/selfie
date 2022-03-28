@@ -8,15 +8,17 @@ use core::ops::DerefMut;
 use core::pin::Pin;
 use stable_deref_trait::StableDeref;
 
-impl<'a, P: StableDeref + 'a, R: for<'this> RefType<'this>> Selfie<'a, P, R> {
+impl<'a, P, R> Selfie<'a, P, R>
+where
+    P: StableDeref + 'a,
+    R: for<'this> RefType<'this>,
+    P::Target: 'a,
+{
     #[inline]
     pub fn new(
         owned: Pin<P>,
         handler: for<'this> fn(&'this P::Target) -> <R as RefType<'this>>::Ref,
-    ) -> Self
-    where
-        P::Target: 'a,
-    {
+    ) -> Self {
         struct FnToReferential<P: StableDeref, R: for<'this> RefType<'this>>(
             for<'this> fn(&'this P::Target) -> <R as RefType<'this>>::Ref,
         );

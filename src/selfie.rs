@@ -13,7 +13,11 @@ use core::ops::DerefMut;
 use core::pin::Pin;
 use stable_deref_trait::StableDeref;
 
-pub struct Selfie<'a, P: 'a, R: for<'this> RefType<'this> + ?Sized> {
+pub struct Selfie<'a, P, R>
+where
+    P: 'a,
+    R: for<'this> RefType<'this>,
+{
     // SAFETY: enforce drop order!
     // SAFETY: Note that Ref's lifetime isn't actually ever 'a: it is the unnameable 'this instead.
     // Marking it as 'a is a trick to be able to store it and still name the whole type.
@@ -23,11 +27,13 @@ pub struct Selfie<'a, P: 'a, R: for<'this> RefType<'this> + ?Sized> {
     owned: Pin<P>,
 }
 
-impl<'a, P: StableDeref + 'a, R: for<'this> RefType<'this>> Selfie<'a, P, R> {
-    pub fn new_with(owned: Pin<P>, handler: impl ToReferential<P, R>) -> Self
-    where
-        P::Target: 'a,
-    {
+impl<'a, P, R> Selfie<'a, P, R>
+where
+    P: StableDeref + 'a,
+    R: for<'this> RefType<'this>,
+    P::Target: 'a,
+{
+    pub fn new_with(owned: Pin<P>, handler: impl ToReferential<P, R>) -> Self {
         // SAFETY: This type does not expose anything that could expose referential longer than owned exists
         let detached = unsafe { detach_lifetime(owned.as_ref()) }.get_ref();
 
@@ -68,7 +74,7 @@ impl<'a, P: StableDeref + 'a, R: for<'this> RefType<'this>> Selfie<'a, P, R> {
     }
 
     #[inline]
-    pub fn map<R2: for<'this> RefType<'this> + ?Sized>(
+    pub fn map<R2: for<'this> RefType<'this>>(
         self,
         mapper: for<'this> fn(
             <R as RefType<'this>>::Ref,
@@ -85,14 +91,20 @@ impl<'a, P: StableDeref + 'a, R: for<'this> RefType<'this>> Selfie<'a, P, R> {
     }
 }
 
-pub struct SelfieMut<'a, P: 'a, R: for<'this> RefType<'this> + ?Sized> {
+pub struct SelfieMut<'a, P, R>
+where
+    P: 'a,
+    R: for<'this> RefType<'this> + ?Sized,
+{
     // SAFETY: enforce drop order!
     referential: <R as RefType<'a>>::Ref,
     owned: Pin<P>,
 }
 
-impl<'a, P: StableDeref + DerefMut + 'a, R: for<'this> RefType<'this> + ?Sized>
-    SelfieMut<'a, P, R>
+impl<'a, P, R> SelfieMut<'a, P, R>
+where
+    P: StableDeref + DerefMut + 'a,
+    R: for<'this> RefType<'this> + ?Sized,
 {
     #[inline]
     pub fn new(
@@ -135,17 +147,20 @@ impl<'a, P: StableDeref + DerefMut + 'a, R: for<'this> RefType<'this> + ?Sized>
     pub fn into_inner(self) -> Pin<P> {
         self.owned
     }
-    /*
+
     #[inline]
-    pub fn map<R2: for<'this> RefType<'this> + ?Sized>(
+    pub fn map<R2: for<'this> RefType<'this>>(
         self,
-        mapper: impl for<'this> FnOnce(<R as RefType<'this>>::Ref) -> <R2 as RefType<'this>>::Ref,
+        mapper: impl for<'this> FnOnce(
+            <R as RefType<'this>>::Ref,
+            &'this (), // This is needed to constrain the lifetime TODO: find a way to remove this
+        ) -> <R2 as RefType<'this>>::Ref,
     ) -> Selfie<'a, P, R2> {
         // SAFETY: here we break the lifetime guarantees: we must be very careful to not drop owned before referential
         let Self { owned, referential } = self;
 
-        let referential = mapper(referential);
+        let referential = mapper(referential, &());
 
         Selfie { owned, referential }
-    }*/
+    }
 }
