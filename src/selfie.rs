@@ -115,10 +115,12 @@ where
         P::Target: 'a,
     {
         // SAFETY: This type does not expose anything that could expose referential longer than owned exists
-        let detached = unsafe { detach_lifetime_mut(pinned.as_mut()) };
+        let derefd = unsafe { detach_lifetime_mut(pinned.as_mut()) };
+
+        let referential = handler(derefd);
 
         Self {
-            referential: handler(detached),
+            referential,
             owned: pinned,
         }
     }

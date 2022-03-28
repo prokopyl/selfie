@@ -33,3 +33,16 @@ pub unsafe fn downcast_mut<'s, 'owned: 's, R: for<'this> RefType<'this> + ?Sized
 ) -> &'s mut <R as RefType<'s>>::Ref {
     ::core::mem::transmute(referential)
 }
+
+/// Same as detach_borrow
+#[inline]
+pub unsafe fn detach_lifetime_ref<'this, T>(this: &T) -> &'this T {
+    // SAFETY: same as detach_borrow
+    &*(this as *const _)
+}
+/// Same as detach_borrow
+#[inline]
+pub unsafe fn detach_lifetime_ref_mut<'this, T>(this: &mut T) -> &'this mut T {
+    // SAFETY: same as detach_borrow
+    &mut *(this as *mut _)
+}

@@ -1,0 +1,11 @@
+error[E0277]: the trait bound `UnstableBox<PinnedSelfie<'_, i32, selfie::refs::Ref<i32>>>: StableOwned<PinnedSelfie<'_, {integer}, _>>` is not satisfied
+  --> tests/compile_fail/unstable_deref_pinned.rs:23:63
+   |
+23 |     let data: Pin<UnstableBox<PinnedSelfie<i32, Ref<i32>>>> = PinnedSelfie::new(42, |value| value);
+   |                                                               ^^^^^^^^^^^^^^^^^ the trait `StableOwned<PinnedSelfie<'_, {integer}, _>>` is not implemented for `UnstableBox<PinnedSelfie<'_, i32, selfie::refs::Ref<i32>>>`
+   |
+note: required by a bound in `PinnedSelfie::<'a, T, R>::new`
+  --> src/pinned_selfie.rs
+   |
+   |     pub fn new<P: 'a + StableOwned<Self>>(
+   |                        ^^^^^^^^^^^^^^^^^ required by this bound in `PinnedSelfie::<'a, T, R>::new`
