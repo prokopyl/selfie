@@ -1,3 +1,5 @@
+#![allow(unsafe_code)]
+
 use core::ops::Deref;
 use core::pin::Pin;
 use stable_deref_trait::StableDeref;
@@ -83,12 +85,12 @@ const _: () = {
 
     #[inline]
     fn rc_get_pin_mut<T>(pin: &mut Pin<Rc<T>>) -> Option<Pin<&mut T>> {
-        // SAFETY: Arc::get_mut does not move anything
+        // SAFETY: Rc::get_mut does not move anything
         let rc = unsafe { pin_get_ptr_unchecked_mut(pin) };
         let inner = Rc::get_mut(rc)?;
 
         // SAFETY: By using get_mut we guaranteed this is the only reference to it.
-        // The &mut Pin<Arc<T>> argument guarantees this data was pinned, and the temporary Arc reference
+        // The &mut Pin<Rc<T>> argument guarantees this data was pinned, and the temporary Rc reference
         // is never exposed.
         unsafe { Some(Pin::new_unchecked(inner)) }
     }

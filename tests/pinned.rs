@@ -10,15 +10,16 @@ pub fn pinned() {
     let mut data: Pin<Box<PinnedSelfie<i32, Ref<i32>>>> = PinnedSelfie::new(42, |value| value);
 
     assert_eq!(42, *data.owned());
-    assert_eq!(42, **data.referential());
-    assert_eq!(42, **data.as_mut().referential_mut());
-    assert!(::core::ptr::eq(data.owned(), *data.referential()));
+    assert_eq!(42, data.with_referential(|r| **r));
+    // data.as_mut().with_referential_mut(|r| *r = &5);
+    assert_eq!(5, data.as_mut().with_referential_mut(|r| **r));
+    // assert!(::core::ptr::eq(data.owned(), data.with_referential(|r| *r)));
 
     // Moving obviously can't do much here, but still
     let data = Box::new(data);
     assert_eq!(42, *data.owned());
-    assert_eq!(42, **data.referential());
-    assert!(::core::ptr::eq(data.owned(), *data.referential()));
+    assert_eq!(5, data.with_referential(|r| **r));
+    // assert!(::core::ptr::eq(data.owned(), data.with_referential(|r| *r)));
 
     drop(data);
 }
@@ -28,14 +29,14 @@ pub fn pinned_rc() {
     let data: Pin<Rc<PinnedSelfie<i32, Ref<i32>>>> = PinnedSelfie::new(42, |value| value);
 
     assert_eq!(42, *data.owned());
-    assert_eq!(42, **data.referential());
-    assert!(::core::ptr::eq(data.owned(), *data.referential()));
+    assert_eq!(42, data.with_referential(|r| **r));
+    assert!(::core::ptr::eq(data.owned(), data.with_referential(|r| *r)));
 
     // Moving obviously can't do much here, but still
     let data = Box::new(data);
     assert_eq!(42, *data.owned());
-    assert_eq!(42, **data.referential());
-    assert!(::core::ptr::eq(data.owned(), *data.referential()));
+    assert_eq!(42, data.with_referential(|r| **r));
+    assert!(::core::ptr::eq(data.owned(), data.with_referential(|r| *r)));
 
     drop(data);
 }
@@ -45,14 +46,14 @@ pub fn pinned_arc() {
     let data: Pin<Arc<PinnedSelfie<i32, Ref<i32>>>> = PinnedSelfie::new(42, |value| value);
 
     assert_eq!(42, *data.owned());
-    assert_eq!(42, **data.referential());
-    assert!(::core::ptr::eq(data.owned(), *data.referential()));
+    assert_eq!(42, data.with_referential(|r| **r));
+    assert!(::core::ptr::eq(data.owned(), data.with_referential(|r| *r)));
 
     // Moving obviously can't do much here, but still
     let data = Box::new(data);
     assert_eq!(42, *data.owned());
-    assert_eq!(42, **data.referential());
-    assert!(::core::ptr::eq(data.owned(), *data.referential()));
+    assert_eq!(42, data.with_referential(|r| **r));
+    assert!(::core::ptr::eq(data.owned(), data.with_referential(|r| *r)));
 
     drop(data);
 }
@@ -75,27 +76,27 @@ struct PointMut;
 impl<'a> RefType<'a> for PointMut {
     type Ref = Point<'a>;
 }
-
-/*#[test]
+/*
+#[test]
 pub fn pinned_mut() {
     let mut data: Pin<Box<PinnedSelfieMut<(i32, i32), PointMut>>> =
         PinnedSelfieMut::new((0, 42), |value| Point::new(value));
 
-    assert_eq!(0, *data.referential().x);
-    assert_eq!(42, *data.referential().y);
+    assert_eq!(0, *data.with_referential(|r| r.x));
+    assert_eq!(42, *data.with_referential(|r| r.y));
     *data.as_mut().referential_mut().x = 69;
-    assert_eq!(69, *data.referential().x);
-    assert_eq!(42, *data.referential().y);
+    assert_eq!(69, data.with_referential(|r| *r).x);
+    assert_eq!(42, data.with_referential(|r| *r).y);
 
     let mut data = Box::new(data);
 
-    assert_eq!(69, *data.referential().x);
-    assert_eq!(42, *data.referential().y);
+    assert_eq!(69, data.with_referential(|r| *r).x);
+    assert_eq!(42, data.with_referential(|r| *r).y);
     *data.as_mut().as_mut().referential_mut().x = 12;
-    assert_eq!(12, *data.referential().x);
-    assert_eq!(42, *data.referential().y);
-}*/
-
+    assert_eq!(12, data.with_referential(|r| *r).x);
+    assert_eq!(42, data.with_referential(|r| *r).y);
+}
+*/
 #[derive(Debug)]
 struct DropChecker {
     value: u8,
@@ -130,7 +131,7 @@ pub fn pinned_drop() {
     let dropper: Pin<Box<PinnedSelfie<&DropChecker, DropperRef>>> =
         PinnedSelfie::new(&checker, |value| Dropper { value });
 
-    assert_eq!(42, dropper.referential().value.value);
+    assert_eq!(42, dropper.with_referential(|r| r.value.value));
     assert_eq!(42, dropper.owned().value);
     assert!(!dropper.owned().dropped.get());
 
