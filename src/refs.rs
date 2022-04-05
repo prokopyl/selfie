@@ -39,7 +39,13 @@ where
 impl<'a, P, R> RefType<'a> for SelfieRefMut<P, R>
 where
     P: RefType<'a>,
-    R: 'a + for<'this> RefType<'this> + ?Sized,
+    R: 'a + for<'this> RefType<'this>,
 {
     type Ref = SelfieMut<'a, P::Ref, R>;
+}
+
+// Other std types
+
+impl<'a, R: RefType<'a>> RefType<'a> for Option<R> {
+    type Ref = Option<R::Ref>;
 }

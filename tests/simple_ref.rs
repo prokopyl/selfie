@@ -10,12 +10,12 @@ pub fn simple_int() {
     let data: Selfie<Box<i32>, Ref<i32>> = Selfie::new(my_int, |i| i);
 
     assert_eq!(42, *data.owned());
-    data.with_referential(|i| assert_eq!(&42, *i));
+    assert_eq!(42, *data.referential());
 
     let data = Box::new(data);
 
     assert_eq!(42, *data.owned());
-    data.with_referential(|i| assert_eq!(&42, *i));
+    assert_eq!(42, *data.referential());
 }
 
 #[test]
@@ -24,12 +24,12 @@ pub fn simple_str() {
     let data: Selfie<String, Ref<str>> = Selfie::new(my_str, |i| &i[0..5]);
 
     assert_eq!("Hello, world!", data.owned());
-    data.with_referential(|i| assert_eq!(&"Hello", i));
+    assert_eq!("Hello", data.referential());
 
     let data = Box::new(data);
 
     assert_eq!("Hello, world!", data.owned());
-    data.with_referential(|i| assert_eq!(&"Hello", i));
+    assert_eq!("Hello", data.referential());
 }
 
 #[test]
@@ -38,12 +38,12 @@ pub fn different_int() {
     let data: Selfie<Arc<i32>, Ref<i32>> = Selfie::new(my_int, |i| i);
 
     assert_eq!(42, *data.owned());
-    data.with_referential(|i| assert_eq!(&42, *i));
+    assert_eq!(42, *data.referential());
 
     let data = Box::new(data);
 
     assert_eq!(42, *data.owned());
-    data.with_referential(|i| assert_eq!(&42, *i));
+    assert_eq!(42, *data.referential());
 }
 
 struct Point<'a> {
@@ -129,54 +129,8 @@ pub fn refcell() {
 
     let selfie = all_but_first_char(&refcell);
     assert!(refcell.try_borrow_mut().is_err());
-    selfie.with_referential(|i| assert_eq!(&"ello, world!", i));
+    assert_eq!("ello, world!", selfie.referential());
     drop(selfie);
 
     assert!(refcell.try_borrow_mut().is_ok());
 }
-
-struct Bar<'a>(RefCell<(Option<&'a Bar<'a>>, String)>);
-
-struct BarRef;
-impl<'a> RefType<'a> for BarRef {
-    type Ref = Bar<'a>;
-}
-
-/*#[test]
-fn main() {
-    let value = Box::pin(());
-
-    let mut selfie: Selfie<Box<()>, BarRef> =
-        Selfie::new(value, |_| Bar(RefCell::new((None, "Hello".to_owned()))));
-
-    selfie.referential().0.borrow_mut().0 = Some(selfie.referential());
-
-    let dep = selfie.referential_mut();
-    let r1 = dep.0.get_mut();
-    let string_ref_1 = &mut r1.1;
-    let mut r2 = r1.0.unwrap().0.borrow_mut();
-    let string_ref_2 = &mut r2.1;
-
-    let s = &string_ref_1[..];
-    string_ref_2.clear();
-    string_ref_2.shrink_to_fit();
-    println!("{}", s); // prints garbage
-}*/
-
-/*#[test]
-fn normal() {
-    let mut bar: &mut Bar = Box::leak(Box::new(Bar(RefCell::new((None, "Hello".to_owned())))));
-
-    bar.0.borrow_mut().0 = Some(&bar);
-
-    let mut r1 = bar.0.get_mut();
-    let string_ref_1 = &mut r1.1;
-    let mut r2 = r1.0.unwrap().0.borrow_mut();
-    let string_ref_2 = &mut r2.1;
-
-    let s = &string_ref_1[..];
-    string_ref_2.clear();
-    string_ref_2.shrink_to_fit();
-    println!("{}", s); // prints garbage
-}
-*/

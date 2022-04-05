@@ -9,8 +9,8 @@ error[E0277]: the trait bound `UnstableInt: stable_deref_trait::StableDeref` is 
 note: required by a bound in `selfie::safe::<impl Selfie<'a, P, R>>::new`
   --> src/safe.rs
    |
-   | impl<'a, P: StableDeref + 'a, R: for<'this> RefType<'this>> Selfie<'a, P, R> {
-   |             ^^^^^^^^^^^ required by this bound in `selfie::safe::<impl Selfie<'a, P, R>>::new`
+   |     P: StableDeref + 'a,
+   |        ^^^^^^^^^^^ required by this bound in `selfie::safe::<impl Selfie<'a, P, R>>::new`
 help: consider borrowing here
    |
 18 |     let data: Selfie<UnstableInt, Ref<i32>> = Selfie::new(&int, |i| i);

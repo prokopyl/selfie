@@ -1,18 +1,35 @@
 //! This internal module contains the implementation details for Selfie and SelfieMut.
 //!
-//! **Do not make any change here without adding new regression and/or MIRI tests!**
+//! **Do not make any change here without adding new regression, compile-fail and/or MIRI tests!**
 //!
 //! I do not trust myself in here, and neither should you.
 
 #![allow(unsafe_code)] // I'll be glad to remove this the day self-referential structs can be implemented in Safe Rust
 
-use crate::convert::ToReferential;
+use crate::convert::{IntoReferential, IntoReferentialMut};
 use crate::refs::*;
 use crate::utils::*;
 use core::ops::DerefMut;
 use core::pin::Pin;
 use stable_deref_trait::StableDeref;
 
+/// A self-referential struct with a shared reference (`R`) to an object owned by a pinned pointer (`P`).
+///
+/// # Example
+///
+/// This example stores both an owned `String` and a [`str`] slice pointing
+/// into it.
+///
+/// ```
+/// use core::pin::Pin;
+/// use selfie::{refs::Ref, Selfie};
+///
+/// let data: Pin<String> = Pin::new("Hello, world!".to_owned());
+/// let selfie: Selfie<String, Ref<str>> = Selfie::new(data, |s| &s[0..5]);
+///
+/// assert_eq!("Hello", selfie.referential());
+/// assert_eq!("Hello, world!", selfie.owned());
+/// ```
 pub struct Selfie<'a, P, R>
 where
     P: 'a,
@@ -33,12 +50,12 @@ where
     R: for<'this> RefType<'this>,
     P::Target: 'a,
 {
-    pub fn new_with(owned: Pin<P>, handler: impl ToReferential<P, R>) -> Self {
+    pub fn new_with(owned: Pin<P>, handler: impl IntoReferential<P, R>) -> Self {
         // SAFETY: This type does not expose anything that could expose referential longer than owned exists
         let detached = unsafe { detach_lifetime(owned.as_ref()) }.get_ref();
 
         Self {
-            referential: handler.to_referential(detached),
+            referential: handler.into_referential(detached),
             owned,
         }
     }
@@ -94,7 +111,7 @@ where
 pub struct SelfieMut<'a, P, R>
 where
     P: 'a,
-    R: for<'this> RefType<'this> + ?Sized,
+    R: for<'this> RefType<'this>,
 {
     // SAFETY: enforce drop order!
     referential: <R as RefType<'a>>::Ref,
@@ -104,22 +121,15 @@ where
 impl<'a, P, R> SelfieMut<'a, P, R>
 where
     P: StableDeref + DerefMut + 'a,
-    R: for<'this> RefType<'this> + ?Sized,
+    R: for<'this> RefType<'this>,
 {
-    #[inline]
-    pub fn new(
-        mut pinned: Pin<P>,
-        handler: for<'this> fn(Pin<&'this mut P::Target>) -> <R as RefType<'this>>::Ref,
-    ) -> Self
-    where
-        P::Target: 'a,
-    {
+    pub fn new_with(mut owned: Pin<P>, handler: impl IntoReferentialMut<P, R>) -> Self {
         // SAFETY: This type does not expose anything that could expose referential longer than owned exists
-        let detached = unsafe { detach_lifetime_mut(pinned.as_mut()) };
+        let detached = unsafe { detach_lifetime_mut(owned.as_mut()) };
 
         Self {
-            referential: handler(detached),
-            owned: pinned,
+            referential: handler.into_referential(detached),
+            owned,
         }
     }
 
