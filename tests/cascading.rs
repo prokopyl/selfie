@@ -86,6 +86,6 @@ pub fn cascading_mut() {
 
     let data = Box::new(data);
     data.with_referential(|r1| r1.with_referential(|r2| assert_eq!(&b"la", r2)));
-    let my_str = data.into_inner();
+    let my_str = data.into_owned();
     assert_eq!(b"Hella, world!", &my_str[..]);
 }

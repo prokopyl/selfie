@@ -15,6 +15,27 @@ use stable_deref_trait::StableDeref;
 
 /// A self-referential struct with a shared reference (`R`) to an object owned by a pinned pointer (`P`).
 ///
+/// This struct is a simple wrapper containing both the pinned pointer `P` and the shared reference to it `R` alongside it.
+/// It does not perform any additional kind of boxing or other kind of allocation or moving.
+///
+/// A [`Selfie`] is constructed by using the [`new`](Selfie::new) constructor, which requires the pinned pointer `P`,
+/// and a function to create
+///
+/// Because `R` references the data behind `P` for as long as this struct exists, the data behind `P`
+/// has to be considered to be borrowed for the lifetime of the [`Selfie`].
+///
+/// Therefore, you can only access the data behind `P` through shared references (`&T`) using [`owned`](Selfie::owned), or by
+/// using [`into_owned`](Selfie::into_owned), which drops `R` and returns `P` as it was given to
+/// the constructor.
+///
+/// Note that the referential type `R` is not accessible outside of the [`Selfie`] either, and can
+/// only be accessed by temporarily borrowing it through the [`with_referential`](Selfie::with_referential)
+/// and [`with_referential_mut`](Selfie::with_referential_mut) methods, which hide its true lifetime.
+///
+/// This is done because `R` actually has a self-referential lifetime, which cannot be named
+/// in Rust's current lifetime system. However, the [`referential`](Selfie::referential) method is
+/// also provided for convenience, which returns a copy of the referential type if it implements [`Copy`].
+///
 /// # Example
 ///
 /// This example stores both an owned `String` and a [`str`] slice pointing
@@ -50,7 +71,10 @@ where
     R: for<'this> RefType<'this>,
     P::Target: 'a,
 {
-    pub fn new_with(owned: Pin<P>, handler: impl IntoReferential<P, R>) -> Self {
+    pub fn new_with<F>(owned: Pin<P>, handler: F) -> Self
+    where
+        F: IntoReferential<P, R>,
+    {
         // SAFETY: This type does not expose anything that could expose referential longer than owned exists
         let detached = unsafe { detach_lifetime(owned.as_ref()) }.get_ref();
 
@@ -60,11 +84,37 @@ where
         }
     }
 
+    /// Returns a shared reference to the owned type by dereferencing `P`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use core::pin::Pin;
+    /// use selfie::{refs::Ref, Selfie};
+    ///
+    /// let data: Pin<Box<u32>> = Box::pin(42);
+    /// let selfie: Selfie<Box<u32>, Ref<u32>> = Selfie::new(data, |i| &i);
+    ///
+    /// assert_eq!(&42, selfie.owned());
+    /// ```
     #[inline]
     pub fn owned(&self) -> &P::Target {
         self.owned.as_ref().get_ref()
     }
 
+    /// Performs an operation borrowing the referential type `R`, and returning its result.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use core::pin::Pin;
+    /// use selfie::{refs::Ref, Selfie};
+    ///
+    /// let data: Pin<Box<u32>> = Box::pin(42);
+    /// let selfie: Selfie<Box<u32>, Ref<u32>> = Selfie::new(data, |i| &i);
+    ///
+    /// assert_eq!(50, selfie.with_referential(|r| *r + 8));
+    /// ```
     #[inline]
     pub fn with_referential<'s, F, T>(&'s self, handler: F) -> T
     where
@@ -75,6 +125,27 @@ where
         handler(referential)
     }
 
+    /// Performs an operation mutably borrowing the referential type `R`, and returning its result.
+    ///
+    /// Note that this operation *cannot* mutably access the data behind `P`, it only mutates the
+    /// referential type `R` itself.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use core::pin::Pin;
+    /// use selfie::{refs::Ref, Selfie};
+    ///
+    /// let data: Pin<String> = Pin::new("Hello, world!".to_owned());
+    /// let mut selfie: Selfie<String, Ref<str>> = Selfie::new(data, |s| &s[0..5]);
+    ///
+    /// assert_eq!("Hello", selfie.referential());
+    /// assert_eq!("Hello, world!", selfie.owned());
+    ///
+    /// selfie.with_referential_mut(|s| *s = &s[0..2]);
+    ///
+    /// assert_eq!("He", selfie.referential());
+    /// assert_eq!("Hello, world!", selfie.owned());
     #[inline]
     pub fn with_referential_mut<'s, F, T>(&'s mut self, handler: F) -> T
     where
@@ -85,8 +156,9 @@ where
         handler(referential)
     }
 
+    /// Unwraps the [`Selfie`] by
     #[inline]
-    pub fn into_inner(self) -> Pin<P> {
+    pub fn into_owned(self) -> Pin<P> {
         self.owned
     }
 
@@ -154,7 +226,7 @@ where
     }
 
     #[inline]
-    pub fn into_inner(self) -> Pin<P> {
+    pub fn into_owned(self) -> Pin<P> {
         self.owned
     }
 

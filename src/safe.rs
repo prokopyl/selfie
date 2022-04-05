@@ -19,18 +19,7 @@ where
         owned: Pin<P>,
         handler: for<'this> fn(&'this P::Target) -> <R as RefType<'this>>::Ref,
     ) -> Self {
-        struct FnToReferential<P: StableDeref, R: for<'this> RefType<'this>>(
-            for<'this> fn(&'this P::Target) -> <R as RefType<'this>>::Ref,
-        );
-
-        impl<P: StableDeref, R: for<'this> RefType<'this>> IntoReferential<P, R> for FnToReferential<P, R> {
-            #[inline]
-            fn into_referential(self, owned: &P::Target) -> <R as RefType>::Ref {
-                (self.0)(owned)
-            }
-        }
-
-        Self::new_with(owned, FnToReferential(handler))
+        Self::new_with(owned, handler)
     }
 
     #[inline]
