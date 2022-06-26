@@ -19,7 +19,7 @@ use stable_deref_trait::StableDeref;
 /// It does not perform any additional kind of boxing or other kind of allocation or moving.
 ///
 /// A [`Selfie`] is constructed by using the [`new`](Selfie::new) constructor, which requires the pinned pointer `P`,
-/// and a function to create
+/// and a function to create the reference type `R` from a shared reference to the data behind `P`.
 ///
 /// Because `R` references the data behind `P` for as long as this struct exists, the data behind `P`
 /// has to be considered to be borrowed for the lifetime of the [`Selfie`].
@@ -34,7 +34,8 @@ use stable_deref_trait::StableDeref;
 ///
 /// This is done because `R` actually has a self-referential lifetime, which cannot be named
 /// in Rust's current lifetime system. However, the [`referential`](Selfie::referential) method is
-/// also provided for convenience, which returns a copy of the referential type if it implements [`Copy`].
+/// also provided for convenience, which returns a copy of the referential type if it implements [`Copy`]
+/// (which is the case for simple references).
 ///
 /// # Example
 ///
@@ -71,6 +72,7 @@ where
     R: for<'this> RefType<'this>,
     P::Target: 'a,
 {
+    /// Constructs a new [`Selfie`] from an
     pub fn new_with<F>(owned: Pin<P>, handler: F) -> Self
     where
         F: IntoReferential<P, R>,
@@ -84,7 +86,7 @@ where
         }
     }
 
-    /// Returns a shared reference to the owned type by dereferencing `P`.
+    /// Returns a shared reference to the owned type by de-referencing `P`.
     ///
     /// # Example
     ///

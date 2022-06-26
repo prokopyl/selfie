@@ -1,6 +1,6 @@
 //! Safe implementations for Selfie and SelfieMut that do not rely on anything internal to it
 
-use crate::convert::{IntoReferential, IntoReferentialMut};
+use crate::convert::IntoReferentialMut;
 use crate::refs::*;
 use crate::{Selfie, SelfieMut};
 use core::fmt::{Debug, Formatter};
