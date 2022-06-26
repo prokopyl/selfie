@@ -1,4 +1,3 @@
-use core::pin::Pin;
 use std::marker::PhantomData;
 use std::ops::Deref;
 
@@ -22,19 +21,16 @@ where
     R: for<'this> RefType<'this>,
 {
     #[inline]
-    pub fn new(
-        owned: Pin<P>,
-        handler: for<'this> fn(&'this P::Target) -> <R as RefType<'this>>::Ref,
-    ) {
+    pub fn new(owned: P, handler: for<'this> fn(&'this P::Target) -> <R as RefType<'this>>::Ref) {
         Self::new_with(owned, handler)
     }
 
-    pub fn new_with<F>(owned: Pin<P>, handler: F)
+    pub fn new_with<F>(owned: P, handler: F)
     where
         F: IntoReferential<P, R>,
     {
-        let detached = owned.as_ref().get_ref();
-        let _ = handler.into_referential(detached);
+        let ptr = owned.deref();
+        let _ = handler.into_referential(ptr);
     }
 }
 
@@ -56,5 +52,5 @@ impl<P: Deref, R: for<'this> RefType<'this>> IntoReferential<P, R>
 }
 
 pub fn example() {
-    let _ = Selfie::<Box<i32>, Ref<i32>>::new(Box::pin(42), |i| i);
+    let _ = Selfie::<Box<i32>, Ref<i32>>::new(Box::new(42), |i| i);
 }

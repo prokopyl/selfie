@@ -1,8 +1,0 @@
-error: lifetime may not live long enough
-  --> tests/compile_fail/circular.rs:21:73
-   |
-21 |         referential.0.borrow_mut().0 = Some(selfie.with_referential(|r| r));
-   |                                                                      -- ^ returning this value requires that `'1` must outlive `'2`
-   |                                                                      ||
-   |                                                                      |return type of closure is &'2 Bar<'_>
-   |                                                                      has type `&'1 Bar<'_>`
