@@ -2,6 +2,7 @@ use selfie::refs::{Ref, RefType};
 use selfie::Selfie;
 use std::panic::catch_unwind;
 use std::pin::Pin;
+use std::rc::Rc;
 
 #[test]
 pub fn simple_map() {
@@ -9,7 +10,7 @@ pub fn simple_map() {
     let selfie: Selfie<String, Ref<str>> = Selfie::new(data, |str| &str[0..5]);
     selfie.with_referential(|s| assert_eq!("Hello", *s));
 
-    let selfie = selfie.map::<Ref<str>>(|str, _| &str[3..]);
+    let selfie = selfie.map::<Ref<str>, _>(|str, _| &str[3..]);
     selfie.with_referential(|s| assert_eq!("lo", *s));
 
     let selfie: Selfie<String, Ref<str>> = selfie.map(|_, owned| &owned[7..]);
@@ -60,4 +61,18 @@ pub fn panic_with_dropped_value() {
         let _: Selfie<Box<str>, DropperRef> = data.map(|_, _| panic!("Haha"));
     })
     .unwrap_err();
+}
+
+#[test]
+pub fn cloned_map() {
+    let data = Rc::pin("Hello, world!".to_owned());
+    let selfie: Selfie<Rc<String>, Ref<str>> = Selfie::new(data, |str| &str[0..5]);
+    selfie.with_referential(|s| assert_eq!("Hello", *s));
+
+    let second_selfie = selfie.map_cloned::<Ref<str>, _>(|str, _| &str[3..]);
+    second_selfie.with_referential(|s| assert_eq!("lo", *s));
+    selfie.with_referential(|s| assert_eq!("Hello", *s)); // Old one still works
+
+    drop(selfie);
+    second_selfie.with_referential(|s| assert_eq!("lo", *s)); // New one still works
 }

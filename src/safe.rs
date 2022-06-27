@@ -1,11 +1,9 @@
 //! Safe implementations for Selfie and SelfieMut that do not rely on anything internal to it
 
-use crate::convert::IntoReferentialMut;
 use crate::refs::*;
 use crate::{Selfie, SelfieMut};
 use core::fmt::{Debug, Formatter};
 use core::ops::DerefMut;
-use core::pin::Pin;
 use stable_deref_trait::StableDeref;
 
 impl<'a, P, R> Selfie<'a, P, R>
@@ -14,14 +12,6 @@ where
     R: for<'this> RefType<'this>,
     P::Target: 'a,
 {
-    #[inline]
-    pub fn new(
-        owned: Pin<P>,
-        handler: for<'this> fn(&'this P::Target) -> <R as RefType<'this>>::Ref,
-    ) -> Self {
-        Self::new_with(owned, handler)
-    }
-
     #[inline]
     pub fn referential<'s>(&'s self) -> <R as RefType<'s>>::Ref
     where
@@ -54,27 +44,6 @@ where
     R: for<'this> RefType<'this>,
     P::Target: 'a,
 {
-    #[inline]
-    pub fn new(
-        owned: Pin<P>,
-        handler: for<'this> fn(Pin<&'this mut P::Target>) -> <R as RefType<'this>>::Ref,
-    ) -> Self {
-        struct FnToReferential<P: StableDeref + DerefMut, R: for<'this> RefType<'this>>(
-            for<'this> fn(Pin<&'this mut P::Target>) -> <R as RefType<'this>>::Ref,
-        );
-
-        impl<P: StableDeref + DerefMut, R: for<'this> RefType<'this>> IntoReferentialMut<P, R>
-            for FnToReferential<P, R>
-        {
-            #[inline]
-            fn into_referential(self, owned: Pin<&mut P::Target>) -> <R as RefType>::Ref {
-                (self.0)(owned)
-            }
-        }
-
-        Self::new_with(owned, FnToReferential(handler))
-    }
-
     #[inline]
     pub fn referential<'s>(&'s self) -> <R as RefType<'s>>::Ref
     where

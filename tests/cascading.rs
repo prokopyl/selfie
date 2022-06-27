@@ -13,9 +13,7 @@ pub fn cascading() {
     assert_eq!("Hello, world!", data.owned());
     data.with_referential(|r1| {
         assert_eq!("Hello", r1.owned());
-        r1.with_referential(|r2| {
-            assert_eq!(&"lo", r2);
-        })
+        assert_eq!("lo", r1.referential());
     });
 
     // Moving the Selfie has no consequence
@@ -24,9 +22,7 @@ pub fn cascading() {
     assert_eq!("Hello, world!", data.owned());
     data.with_referential(|r1| {
         assert_eq!("Hello", r1.owned());
-        r1.with_referential(|r2| {
-            assert_eq!(&"lo", r2);
-        })
+        assert_eq!("lo", r1.referential());
     });
 }
 

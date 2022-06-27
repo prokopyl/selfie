@@ -31,24 +31,3 @@ fn cell_mut() {
     let res = helper_mut(owning_ref);
     assert_eq!(res, 20);
 }
-
-// From https://github.com/SabrinaJewson/pinned-aliasable : this detects miscompilation by the Rust compiler
-
-struct Helper {
-    reference: &'static Cell<u8>,
-    owner: Box<Cell<u8>>,
-}
-
-fn helper_x(x: Helper) -> u8 {
-    x.owner.set(10);
-    x.reference.set(20);
-    x.owner.get()
-}
-
-#[test]
-fn miscompile() {
-    let owner = Box::new(Cell::new(0));
-    let reference = unsafe { &*(&*owner as *const Cell<u8>) };
-    let x = Helper { reference, owner };
-    assert_eq!(20, helper_x(x));
-}

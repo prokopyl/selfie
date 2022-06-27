@@ -9,5 +9,3 @@ mod selfie;
 pub use crate::selfie::*;
 
 mod safe;
-
-pub mod convert;

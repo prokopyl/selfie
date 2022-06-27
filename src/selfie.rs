@@ -6,12 +6,11 @@
 
 #![allow(unsafe_code)] // I'll be glad to remove this the day self-referential structs can be implemented in Safe Rust
 
-use crate::convert::{IntoReferential, IntoReferentialMut};
 use crate::refs::*;
 use crate::utils::*;
 use core::ops::DerefMut;
 use core::pin::Pin;
-use stable_deref_trait::StableDeref;
+use stable_deref_trait::{CloneStableDeref, StableDeref};
 
 /// A self-referential struct with a shared reference (`R`) to an object owned by a pinned pointer (`P`).
 ///
@@ -72,16 +71,16 @@ where
     R: for<'this> RefType<'this>,
     P::Target: 'a,
 {
-    /// Constructs a new [`Selfie`] from an
-    pub fn new_with<F>(owned: Pin<P>, handler: F) -> Self
+    #[inline]
+    pub fn new<F>(owned: Pin<P>, handler: F) -> Self
     where
-        F: IntoReferential<P, R>,
+        F: for<'this> FnOnce(&'this P::Target) -> <R as RefType<'this>>::Ref,
     {
         // SAFETY: This type does not expose anything that could expose referential longer than owned exists
         let detached = unsafe { detach_lifetime(owned.as_ref()) }.get_ref();
 
         Self {
-            referential: handler.into_referential(detached),
+            referential: handler(detached),
             owned,
         }
     }
@@ -95,7 +94,7 @@ where
     /// use selfie::{refs::Ref, Selfie};
     ///
     /// let data: Pin<Box<u32>> = Box::pin(42);
-    /// let selfie: Selfie<Box<u32>, Ref<u32>> = Selfie::new(data, |i| &i);
+    /// let selfie: Selfie<Box<u32>, Ref<u32>> = Selfie::new(data, |i| i);
     ///
     /// assert_eq!(&42, selfie.owned());
     /// ```
@@ -113,7 +112,7 @@ where
     /// use selfie::{refs::Ref, Selfie};
     ///
     /// let data: Pin<Box<u32>> = Box::pin(42);
-    /// let selfie: Selfie<Box<u32>, Ref<u32>> = Selfie::new(data, |i| &i);
+    /// let selfie: Selfie<Box<u32>, Ref<u32>> = Selfie::new(data, |i| i);
     ///
     /// assert_eq!(50, selfie.with_referential(|r| *r + 8));
     /// ```
@@ -165,18 +164,35 @@ where
     }
 
     #[inline]
-    pub fn map<R2: for<'this> RefType<'this>>(
-        self,
-        mapper: for<'this> fn(
+    pub fn map<R2: for<'this> RefType<'this>, F>(self, mapper: F) -> Selfie<'a, P, R2>
+    where
+        F: for<'this> FnOnce(
             <R as RefType<'this>>::Ref,
             &'this P::Target,
         ) -> <R2 as RefType<'this>>::Ref,
-    ) -> Selfie<'a, P, R2> {
+    {
         // SAFETY: here we break the lifetime guarantees: we must be very careful to not drop owned before referential
         let Self { owned, referential } = self;
 
         let detached = unsafe { detach_lifetime(owned.as_ref()) }.get_ref();
         let referential = mapper(referential, detached);
+
+        Selfie { owned, referential }
+    }
+
+    #[inline]
+    pub fn map_cloned<R2: for<'this> RefType<'this>, F>(&self, mapper: F) -> Selfie<'a, P, R2>
+    where
+        F: for<'this> FnOnce(
+            &<R as RefType<'this>>::Ref,
+            &'this P::Target,
+        ) -> <R2 as RefType<'this>>::Ref,
+        P: CloneStableDeref,
+    {
+        let owned = self.owned.clone();
+
+        let detached = unsafe { detach_lifetime(owned.as_ref()) }.get_ref();
+        let referential = mapper(&self.referential, detached);
 
         Selfie { owned, referential }
     }
@@ -197,12 +213,15 @@ where
     P: StableDeref + DerefMut + 'a,
     R: for<'this> RefType<'this>,
 {
-    pub fn new_with(mut owned: Pin<P>, handler: impl IntoReferentialMut<P, R>) -> Self {
+    pub fn new<F>(mut owned: Pin<P>, handler: F) -> Self
+    where
+        F: for<'this> FnOnce(Pin<&'this mut P::Target>) -> <R as RefType<'this>>::Ref,
+    {
         // SAFETY: This type does not expose anything that could expose referential longer than owned exists
         let detached = unsafe { detach_lifetime_mut(owned.as_mut()) };
 
         Self {
-            referential: handler.into_referential(detached),
+            referential: handler(detached),
             owned,
         }
     }
