@@ -14,8 +14,10 @@ use stable_deref_trait::{CloneStableDeref, StableDeref};
 
 /// A self-referential struct with a shared reference (`R`) to an object owned by a pinned pointer (`P`).
 ///
+/// If you need a self-referential struct with an exclusive (mutable) reference to the data behind `P`, see [`SelfieMut`].
+///
 /// This struct is a simple wrapper containing both the pinned pointer `P` and the shared reference to it `R` alongside it.
-/// It does not perform any additional kind of boxing or other kind of allocation or moving.
+/// It does not perform any additional kind of boxing or allocation.
 ///
 /// A [`Selfie`] is constructed by using the [`new`](Selfie::new) constructor, which requires the pinned pointer `P`,
 /// and a function to create the reference type `R` from a shared reference to the data behind `P`.
@@ -35,6 +37,11 @@ use stable_deref_trait::{CloneStableDeref, StableDeref};
 /// in Rust's current lifetime system. However, the [`referential`](Selfie::referential) method is
 /// also provided for convenience, which returns a copy of the referential type if it implements [`Copy`]
 /// (which is the case for simple references).
+///
+/// Also because of the non-nameable self-referential lifetime, `R` is not the referential type
+/// itself, but a stand-in that implements [`RefType`] (e.g. [`Ref<T>`](Ref) instead of `&T`).
+/// See the [`refs`](crate::refs) module for some reference type stand-ins this library provides, or see
+/// the [`RefType`] trait documentation for how to implement your own.
 ///
 /// # Example
 ///
@@ -71,6 +78,25 @@ where
     R: for<'this> RefType<'this>,
     P::Target: 'a,
 {
+    /// Creates a new [`Selfie`] from a pinned pointer `P`, and a closure to create the reference
+    /// type `R` from a shared reference to the data behind `P`.
+    ///
+    /// Note the closure cannot expect to be called with a specific lifetime, as it will handle
+    /// the unnameable `'this` lifetime instead.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use std::pin::Pin;
+    /// use selfie::refs::Ref;
+    /// use selfie::Selfie;
+    ///
+    /// let data = Pin::new("Hello, world!".to_owned());
+    /// let selfie: Selfie<String, Ref<str>> = Selfie::new(data, |s| &s[0..5]);
+    ///
+    /// // The selfie now contains both the String buffer and a subslice to "Hello"
+    /// assert_eq!("Hello", selfie.referential());
+    /// ```
     #[inline]
     pub fn new<F>(owned: Pin<P>, handler: F) -> Self
     where
