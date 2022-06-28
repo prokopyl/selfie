@@ -54,6 +54,7 @@ use core::marker::PhantomData;
 /// assert_eq!(STR_1, STR_2);
 /// ```
 pub trait RefType<'a> {
+    /// The full reference type that is to be created when combined with the lifetime `'a`.
     type Ref: 'a + Sized;
 }
 

@@ -5,6 +5,7 @@
 //! I do not trust myself in here, and neither should you.
 
 #![allow(unsafe_code)] // I'll be glad to remove this the day self-referential structs can be implemented in Safe Rust
+#![allow(missing_docs)] // I'll be glad to remove this the day self-referential structs can be implemented in Safe Rust
 
 use crate::refs::*;
 use crate::utils::*;
@@ -129,7 +130,7 @@ where
         self.owned.as_ref().get_ref()
     }
 
-    /// Performs an operation borrowing the referential type `R`, and returning its result.
+    /// Performs an operation borrowing the referential type `R`, and returns its result.
     ///
     /// # Example
     ///
@@ -152,7 +153,7 @@ where
         handler(referential)
     }
 
-    /// Performs an operation mutably borrowing the referential type `R`, and returning its result.
+    /// Performs an operation mutably borrowing the referential type `R`, and returns its result.
     ///
     /// Note that this operation *cannot* mutably access the data behind `P`, it only mutates the
     /// referential type `R` itself.
@@ -183,12 +184,52 @@ where
         handler(referential)
     }
 
-    /// Unwraps the [`Selfie`] by
+    /// Unwraps the [`Selfie`] by dropping the reference type `R`, and returning the owned pointer
+    /// type `P`, as it was passed to the constructor.
+    ///
+    /// # Example
+    /// ```
+    /// use std::pin::Pin;
+    /// use selfie::refs::Ref;
+    /// use selfie::Selfie;
+    ///
+    /// let data = Pin::new("Hello, world!".to_owned());
+    /// let selfie: Selfie<String, Ref<str>> = Selfie::new(data, |str| &str[0..5]);
+    ///
+    /// let original_data: Pin<String> = selfie.into_owned();
+    /// assert_eq!("Hello, world!", original_data.as_ref().get_ref());
+    /// ```
     #[inline]
     pub fn into_owned(self) -> Pin<P> {
         self.owned
     }
 
+    /// Creates a new [`Selfie`] by consuming this [`Selfie`]'s reference type `R` and producing another
+    /// (`R2`), using a given closure.
+    ///
+    /// The owned pointer type `P` is left unchanged, and a shared reference to the data behind it
+    /// is also provided to the closure for convenience.
+    ///
+    /// This methods consumes the [`Selfie`]. If you need to keep it intact, see
+    /// [`map_cloned`](Selfie::map_cloned).
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use std::pin::Pin;
+    /// use selfie::refs::Ref;
+    /// use selfie::Selfie;
+    ///
+    /// let data = Pin::new("Hello, world!".to_owned());
+    /// let selfie: Selfie<String, Ref<str>> = Selfie::new(data, |str| &str[0..5]);
+    /// assert_eq!("Hello", selfie.referential());
+    ///
+    /// let selfie = selfie.map::<Ref<str>, _>(|str, _| &str[3..]);
+    /// assert_eq!("lo", selfie.referential());
+    ///
+    /// let selfie: Selfie<String, Ref<str>> = selfie.map(|_, owned| &owned[7..]);
+    /// assert_eq!("world!", selfie.referential());
+    /// ```
     #[inline]
     pub fn map<R2: for<'this> RefType<'this>, F>(self, mapper: F) -> Selfie<'a, P, R2>
     where
@@ -206,6 +247,33 @@ where
         Selfie { owned, referential }
     }
 
+    /// Creates a new [`Selfie`] by cloning this [`Selfie`]'s reference pointer `P` and producing
+    /// a new reference (`R2`), using a given closure.
+    ///
+    /// The owned pointer type `P` needs to be [`CloneStableDeref`](stable_deref_trait::CloneStableDeref),
+    /// as only the pointer itself is going to be cloned, not the data behind it. Both the current
+    /// reference `R` and the new `R2` will refer to the data behind `P`.
+    ///
+    /// This methods keeps the original [`Selfie`] unchanged, as only its owned pointer is cloned.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use std::rc::Rc;
+    /// use selfie::refs::Ref;
+    /// use selfie::Selfie;
+    ///
+    /// let data = Rc::pin("Hello, world!".to_owned());
+    /// let selfie: Selfie<Rc<String>, Ref<str>> = Selfie::new(data, |str| &str[0..5]);
+    /// selfie.with_referential(|s| assert_eq!("Hello", *s));
+    ///
+    /// let second_selfie = selfie.map_cloned::<Ref<str>, _>(|str, _| &str[3..]);
+    /// second_selfie.with_referential(|s| assert_eq!("lo", *s));
+    /// selfie.with_referential(|s| assert_eq!("Hello", *s)); // Old one still works
+    ///
+    /// drop(selfie);
+    /// second_selfie.with_referential(|s| assert_eq!("lo", *s)); // New one still works
+    /// ```
     #[inline]
     pub fn map_cloned<R2: for<'this> RefType<'this>, F>(&self, mapper: F) -> Selfie<'a, P, R2>
     where
