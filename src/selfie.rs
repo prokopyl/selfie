@@ -5,7 +5,6 @@
 //! I do not trust myself in here, and neither should you.
 
 #![allow(unsafe_code)] // I'll be glad to remove this the day self-referential structs can be implemented in Safe Rust
-#![allow(missing_docs)] // I'll be glad to remove this the day self-referential structs can be implemented in Safe Rust
 
 use crate::refs::*;
 use crate::utils::*;
@@ -292,6 +291,52 @@ where
     }
 }
 
+/// A self-referential struct with a mutable reference (`R`) to an object owned by a pinned pointer (`P`).
+///
+/// If you only need a self-referential struct with an shared reference to the data behind `P`, see [`Selfie`].
+///
+/// This struct is a simple wrapper containing both the pinned pointer `P` and the mutable reference to it `R` alongside it.
+/// It does not perform any additional kind of boxing or allocation.
+///
+/// A [`SelfieMut`] is constructed by using the [`new`](SelfieMut::new) constructor, which requires the pinned pointer `P`,
+/// and a function to create the reference type `R` from a pinned mutable reference to the data behind `P`.
+///
+/// Because `R` references the data behind `P` for as long as this struct exists, the data behind `P`
+/// has to be considered to be exclusively borrowed for the lifetime of the [`SelfieMut`].
+///
+/// Therefore, you cannot access the data behind `P` at all, until
+/// using [`into_owned`](SelfieMut::into_owned), which drops `R` and returns `P` as it was given to
+/// the constructor.
+///
+/// Note that the referential type `R` is not accessible outside of the [`Selfie`] either, and can
+/// only be accessed by temporarily borrowing it through the [`with_referential`](SelfieMut::with_referential)
+/// and [`with_referential_mut`](SelfieMut::with_referential_mut) methods, which hide its true lifetime.
+///
+/// This is done because `R` actually has a self-referential lifetime, which cannot be named
+/// in Rust's current lifetime system. However, the [`referential`](Selfie::referential) method is
+/// also provided for convenience, which returns a copy of the referential type if it implements [`Copy`]
+/// (which is the case for simple references).
+///
+/// Also because of the non-nameable self-referential lifetime, `R` is not the referential type
+/// itself, but a stand-in that implements [`RefType`] (e.g. [`Ref<T>`](Ref) instead of `&T`).
+/// See the [`refs`](crate::refs) module for some reference type stand-ins this library provides, or see
+/// the [`RefType`] trait documentation for how to implement your own.
+///
+/// # Example
+///
+/// This example stores both an owned `String` and a [`str`] slice pointing
+/// into it.
+///
+/// ```
+/// use core::pin::Pin;
+/// use selfie::{refs::Ref, Selfie};
+///
+/// let data: Pin<String> = Pin::new("Hello, world!".to_owned());
+/// let selfie: Selfie<String, Ref<str>> = Selfie::new(data, |s| &s[0..5]);
+///
+/// assert_eq!("Hello", selfie.referential());
+/// assert_eq!("Hello, world!", selfie.owned());
+/// ```
 pub struct SelfieMut<'a, P, R>
 where
     P: 'a,
@@ -307,6 +352,25 @@ where
     P: StableDeref + DerefMut + 'a,
     R: for<'this> RefType<'this>,
 {
+    /// Creates a new [`SelfieMut`] from a pinned pointer `P`, and a closure to create the reference
+    /// type `R` from a shared reference to the data behind `P`.
+    ///
+    /// Note the closure cannot expect to be called with a specific lifetime, as it will handle
+    /// the unnameable `'this` lifetime instead.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use std::pin::Pin;
+    /// use selfie::refs::Mut;
+    /// use selfie::SelfieMut;
+    ///
+    /// let data = Pin::new("Hello, world!".to_owned());
+    /// let selfie: SelfieMut<String, Mut<str>> = SelfieMut::new(data, |s| &mut Pin::into_inner(s)[0..5]);
+    ///
+    /// // The selfie now contains both the String buffer and a subslice to "Hello"
+    /// selfie.with_referential(|r| assert_eq!("Hello", *r));
+    /// ```
     pub fn new<F>(mut owned: Pin<P>, handler: F) -> Self
     where
         F: for<'this> FnOnce(Pin<&'this mut P::Target>) -> <R as RefType<'this>>::Ref,
@@ -320,6 +384,19 @@ where
         }
     }
 
+    /// Performs an operation borrowing the referential type `R`, and returns its result.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use core::pin::Pin;
+    /// use selfie::{refs::Mut, SelfieMut};
+    ///
+    /// let data: Pin<Box<u32>> = Box::pin(42);
+    /// let selfie: SelfieMut<Box<u32>, Mut<u32>> = SelfieMut::new(data, |i| Pin::into_inner(i));
+    ///
+    /// assert_eq!(50, selfie.with_referential(|r| **r + 8));
+    /// ```
     #[inline]
     pub fn with_referential<'s, F, T>(&'s self, handler: F) -> T
     where
@@ -330,6 +407,24 @@ where
         handler(referential)
     }
 
+    /// Performs an operation mutably borrowing the referential type `R`, and returns its result.
+    ///
+    /// Note that this operation *can* mutably access the data behind `P`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use core::pin::Pin;
+    /// use selfie::{refs::Mut, SelfieMut};
+    ///
+    /// let data: Pin<String> = Pin::new("Hello, world!".to_owned());
+    /// let mut selfie: SelfieMut<String, Mut<str>> = SelfieMut::new(data, |s| &mut Pin::into_inner(s)[0..5]);
+    ///
+    /// selfie.with_referential_mut(|s| s.make_ascii_uppercase());
+    /// selfie.with_referential(|s| assert_eq!("HELLO", *s));
+    ///
+    /// let data = Pin::into_inner(selfie.into_owned());
+    /// assert_eq!("HELLO, world!", &data);
     #[inline]
     pub fn with_referential_mut<'s, F, T>(&'s mut self, handler: F) -> T
     where
@@ -340,19 +435,55 @@ where
         handler(referential)
     }
 
+    /// Unwraps the [`SelfieMut`] by dropping the reference type `R`, and returning the owned pointer
+    /// type `P`, as it was passed to the constructor.
+    ///
+    /// # Example
+    /// ```
+    /// use std::pin::Pin;
+    /// use selfie::refs::Mut;
+    /// use selfie::SelfieMut;
+    ///
+    /// let data = Pin::new("Hello, world!".to_owned());
+    /// let selfie: SelfieMut<String, Mut<str>> = SelfieMut::new(data, |str| &mut Pin::into_inner(str)[0..5]);
+    ///
+    /// let original_data: Pin<String> = selfie.into_owned();
+    /// assert_eq!("Hello, world!", original_data.as_ref().get_ref());
+    /// ```
     #[inline]
     pub fn into_owned(self) -> Pin<P> {
         self.owned
     }
 
+    /// Creates a new [`SelfieMut`] by consuming this [`SelfieMut`]'s reference type `R` and producing another
+    /// (`R2`), using a given closure.
+    ///
+    /// The owned pointer type `P` is left unchanged.
+    ///
+    /// This methods consumes the [`SelfieMut`].
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use std::pin::Pin;
+    /// use selfie::refs::Mut;
+    /// use selfie::SelfieMut;
+    ///
+    /// let data = Pin::new("Hello, world!".to_owned());
+    /// let selfie: SelfieMut<String, Mut<str>> = SelfieMut::new(data, |str| &mut Pin::into_inner(str)[0..5]);
+    /// selfie.with_referential(|s| assert_eq!("Hello", *s));
+    ///
+    /// let selfie = selfie.map::<Mut<str>, _>(|str, _| &mut str[3..]);
+    /// selfie.with_referential(|s| assert_eq!("lo", *s));
+    /// ```
     #[inline]
-    pub fn map<R2: for<'this> RefType<'this>>(
-        self,
-        mapper: impl for<'this> FnOnce(
+    pub fn map<R2: for<'this> RefType<'this>, F>(self, mapper: F) -> Selfie<'a, P, R2>
+    where
+        F: for<'this> FnOnce(
             <R as RefType<'this>>::Ref,
             &'this (), // This is needed to constrain the lifetime TODO: find a way to remove this
         ) -> <R2 as RefType<'this>>::Ref,
-    ) -> Selfie<'a, P, R2> {
+    {
         // SAFETY: here we break the lifetime guarantees: we must be very careful to not drop owned before referential
         let Self { owned, referential } = self;
 
