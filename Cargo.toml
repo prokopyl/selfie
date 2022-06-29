@@ -4,7 +4,7 @@ version = "0.0.1"
 rust-version = "1.56"
 edition = "2021"
 
-description = "Experimental, macro-free self-referential structs."
+description = "Experimental, macro-free and allocation-free self-referential structs."
 categories = ["no-std", "rust-patterns"]
 keywords = ["no_std", "self-referential"]
 readme = "README.md"
