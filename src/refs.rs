@@ -115,9 +115,9 @@ impl<'a, T: 'a + ?Sized> RefType<'a> for Mut<T> {
 /// });
 ///
 /// assert_eq!("Hello, world!", selfie.owned());
-/// selfie.with_referential(|r1| {
-///     assert_eq!("Hello", r1.owned());
-///     assert_eq!("lo", r1.referential());
+/// selfie.with_referential(|r| {
+///     assert_eq!("Hello", r.owned());
+///     assert_eq!("lo", r.referential());
 /// });
 /// ```
 pub struct SelfieRef<P, R>(PhantomData<P>, PhantomData<R>)

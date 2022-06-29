@@ -240,6 +240,7 @@ where
         // SAFETY: here we break the lifetime guarantees: we must be very careful to not drop owned before referential
         let Self { owned, referential } = self;
 
+        // SAFETY: This type does not expose anything that could expose referential longer than owned exists
         let detached = unsafe { detach_lifetime(owned.as_ref()) }.get_ref();
         let referential = mapper(referential, detached);
 
@@ -284,6 +285,7 @@ where
     {
         let owned = self.owned.clone();
 
+        // SAFETY: This type does not expose anything that could expose referential longer than owned exists
         let detached = unsafe { detach_lifetime(owned.as_ref()) }.get_ref();
         let referential = mapper(&self.referential, detached);
 
@@ -425,6 +427,7 @@ where
     ///
     /// let data = Pin::into_inner(selfie.into_owned());
     /// assert_eq!("HELLO, world!", &data);
+    /// ```
     #[inline]
     pub fn with_referential_mut<'s, F, T>(&'s mut self, handler: F) -> T
     where
