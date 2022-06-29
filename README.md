@@ -1,6 +1,6 @@
-# selfie
+# Selfie
 
-A lightweight self-referential struct library. Macro-free and allocation-free.
+A lightweight self-referential struct library. Macro-free, allocation-free, and `#![no_std]`.
 
 ### _This crate is experimental and not yet ready for production use!_
 
@@ -33,7 +33,8 @@ There are other self-referential struct libraries out there, but these didn't qu
 * **Support for non-static pointers**: `Selfie` can be tied to any lifetime, allowing the "Owned" pointer to be also
   borrowing something else.
 * **Support for cascading self-references**: Because `Selfie`s can be non-static, and there are no restrictions on
-  referential types, a `Selfie` can itself be used as a referential type in another `Selfie`! This allows 
+  referential types, a `Selfie` can itself be used as a referential type in another `Selfie`! This allows complex
+  self-referential structures to be created.
 
 ## Disadvantages
 
