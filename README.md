@@ -1,5 +1,8 @@
 # Selfie
 
+[![Cargo](https://img.shields.io/crates/v/selfie.svg)](https://crates.io/crates/selfie)
+[![Documentation](https://docs.rs/selfie/badge.svg)](https://docs.rs/selfie)
+
 A lightweight self-referential struct library. Macro-free, allocation-free, and `#![no_std]`.
 
 ### _This crate is experimental and not yet ready for production use!_
