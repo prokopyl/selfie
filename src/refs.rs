@@ -14,6 +14,7 @@
 
 use crate::{Selfie, SelfieMut};
 use core::marker::PhantomData;
+use core::pin::Pin;
 
 /// A trait for reference type stand-ins to be combined with an arbitrary lifetime `'a`, to recreate
 /// the full reference type.
@@ -169,4 +170,30 @@ where
 
 impl<'a, R: RefType<'a>> RefType<'a> for Option<R> {
     type Ref = Option<R::Ref>;
+}
+
+impl<'a, R: RefType<'a>> RefType<'a> for Pin<R> {
+    type Ref = Pin<R::Ref>;
+}
+
+#[cfg(any(feature = "alloc", feature = "std"))]
+mod alloc_impl {
+    extern crate alloc;
+
+    use super::*;
+    use alloc::boxed::Box;
+    use alloc::rc::Rc;
+    use alloc::sync::Arc;
+
+    impl<'a, R: RefType<'a>> RefType<'a> for Box<R> {
+        type Ref = Box<R::Ref>;
+    }
+
+    impl<'a, R: RefType<'a>> RefType<'a> for Rc<R> {
+        type Ref = Rc<R::Ref>;
+    }
+
+    impl<'a, R: RefType<'a>> RefType<'a> for Arc<R> {
+        type Ref = Arc<R::Ref>;
+    }
 }

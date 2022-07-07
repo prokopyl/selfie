@@ -111,6 +111,43 @@ where
         }
     }
 
+    /// Creates a new [`Selfie`] from a pinned pointer `P`, and a fallible closure to create the
+    /// reference type `R` from a shared reference to the data behind `P`.
+    ///
+    /// Note the closure cannot expect to be called with a specific lifetime, as it will handle
+    /// the unnameable `'this` lifetime instead.
+    ///
+    /// # Errors
+    ///
+    /// The closure can return a Result containing either the referential type, or any error type.
+    /// If the closure returns an `Err`, it will be returned right away.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use std::pin::Pin;
+    /// use selfie::refs::Ref;
+    /// use selfie::Selfie;
+    ///
+    /// let data = Pin::new("Hello, world!".to_owned());
+    /// let selfie: Result<Selfie<String, Ref<str>>, ()> = Selfie::try_new(data, |s| Ok(&s[0..5]));
+    ///
+    /// assert_eq!("Hello", selfie.unwrap().referential());
+    /// ```
+    #[inline]
+    pub fn try_new<F, E>(owned: Pin<P>, handler: F) -> Result<Self, E>
+    where
+        F: for<'this> FnOnce(&'this P::Target) -> Result<<R as RefType<'this>>::Ref, E>,
+    {
+        // SAFETY: This type does not expose anything that could expose referential longer than owned exists
+        let detached = unsafe { detach_lifetime(owned.as_ref()) }.get_ref();
+
+        Ok(Self {
+            referential: handler(detached)?,
+            owned,
+        })
+    }
+
     /// Returns a shared reference to the owned type by de-referencing `P`.
     ///
     /// # Example
