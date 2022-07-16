@@ -14,7 +14,7 @@ where
 {
     /// Returns a copy of the reference type, if it implements [`Copy`].
     ///
-    /// The actual reference type cannot be directly borrowed, as it's lifetime is
+    /// The actual reference type cannot be directly borrowed, as its lifetime is
     /// self-referential. If you want to access it without making a copy, see the
     /// [`with_referential`](Selfie::with_referential) method.
     ///
@@ -66,7 +66,7 @@ where
 {
     /// Returns a copy of the reference type, if it implements [`Copy`].
     ///
-    /// The actual reference type cannot be directly borrowed, as it's lifetime is
+    /// The actual reference type cannot be directly borrowed, as its lifetime is
     /// self-referential. If you want to access it without making a copy, see the
     /// [`with_referential`](SelfieMut::with_referential) method.
     ///

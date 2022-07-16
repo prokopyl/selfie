@@ -3,23 +3,23 @@ use core::pin::Pin;
 
 /// An error wrapper containing both an error and an owned value.
 ///
-/// This is used by methods such as [`crate::Selfie::try_new`] to allow recovering the owned pointer if
+/// This is used by methods such as [`Selfie::try_new`](crate::Selfie::try_new) to allow recovering the owned pointer if
 /// its reference handler failed.
-pub struct SelfieError<O, E> {
+pub struct SelfieError<P, E> {
     /// The owned value.
-    pub owned: Pin<O>,
+    pub owned: Pin<P>,
     /// The error value.
     pub error: E,
 }
 
-impl<O, E: Debug> Debug for SelfieError<O, E> {
+impl<P, E: Debug> Debug for SelfieError<P, E> {
     #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         self.error.fmt(f)
     }
 }
 
-impl<O, E: Display> Display for SelfieError<O, E> {
+impl<P, E: Display> Display for SelfieError<P, E> {
     #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         self.error.fmt(f)
@@ -32,7 +32,7 @@ mod std_impl {
     use crate::SelfieError;
     use std::error::Error;
 
-    impl<O, E: Error + 'static> Error for SelfieError<O, E> {
+    impl<P, E: Error + 'static> Error for SelfieError<P, E> {
         #[inline]
         fn source(&self) -> Option<&(dyn Error + 'static)> {
             Some(&self.error)

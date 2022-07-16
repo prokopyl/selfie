@@ -120,8 +120,8 @@ where
     ///
     /// # Errors
     ///
-    /// The closure can return a Result containing either the referential type, or any error type.
-    /// If the closure returns an `Err`, it will be returned right away, alongside the original
+    /// The closure can return a [`Result`] containing either the referential type, or any error type.
+    /// If the closure returns an `Err`, it will be returned in a [`SelfieError`] alongside the original
     /// owned pointer type.
     ///
     /// # Example
@@ -251,7 +251,7 @@ where
     /// The owned pointer type `P` is left unchanged, and a shared reference to the data behind it
     /// is also provided to the closure for convenience.
     ///
-    /// This methods consumes the [`Selfie`]. If you need to keep it intact, see
+    /// This method consumes the [`Selfie`]. If you need to keep it intact, see
     /// [`map_cloned`](Selfie::map_cloned).
     ///
     /// # Example
@@ -295,13 +295,13 @@ where
     /// The owned pointer type `P` is left unchanged, and a shared reference to the data behind it
     /// is also provided to the closure for convenience.
     ///
-    /// This methods consumes the [`Selfie`]. If you need to keep it intact, see
-    /// [`map_cloned`](Selfie::map_cloned).
+    /// This method consumes the [`Selfie`]. If you need to keep it intact, see
+    /// [`try_map_cloned`](Selfie::try_map_cloned).
     ///
     /// # Errors
     ///
-    /// The closure can return a Result containing either the referential type, or any error type.
-    /// If the closure returns an `Err`, it will be returned right away, alongside the original
+    /// The closure can return a [`Result`] containing either the referential type, or any error type.
+    /// If the closure returns an `Err`, it will be returned in a [`SelfieError`] alongside the original
     /// owned pointer type.
     ///
     /// # Example
@@ -352,7 +352,7 @@ where
     /// as only the pointer itself is going to be cloned, not the data behind it. Both the current
     /// reference `R` and the new `R2` will refer to the data behind `P`.
     ///
-    /// This methods keeps the original [`Selfie`] unchanged, as only its owned pointer is cloned.
+    /// This method keeps the original [`Selfie`] unchanged, as only its owned pointer is cloned.
     ///
     /// # Example
     ///
@@ -397,13 +397,12 @@ where
     /// as only the pointer itself is going to be cloned, not the data behind it. Both the current
     /// reference `R` and the new `R2` will refer to the data behind `P`.
     ///
-    /// This methods keeps the original [`Selfie`] unchanged, as only its owned pointer is cloned.
+    /// This method keeps the original [`Selfie`] unchanged, as only its owned pointer is cloned.
     ///
     /// # Errors
     ///
-    /// The closure can return a Result containing either the referential type, or any error type.
-    /// If the closure returns an `Err`, it will be returned right away, alongside the original
-    /// owned pointer type.
+    /// The closure can return a [`Result`] containing either the referential type, or any error type.
+    /// If the closure returns an `Err`, it will be returned right away.
     ///
     /// # Example
     ///
@@ -546,8 +545,9 @@ where
     ///
     /// # Errors
     ///
-    /// The closure can return a Result containing either the referential type, or any error type.
-    /// If the closure returns an `Err`, it will be returned right away.
+    /// The closure can return a [`Result`] containing either the referential type, or any error type.
+    /// If the closure returns an `Err`, it will be returned in a [`SelfieError`] alongside the original
+    /// owned pointer type.
     ///
     /// # Example
     ///
@@ -655,7 +655,7 @@ where
     ///
     /// The owned pointer type `P` is left unchanged.
     ///
-    /// This methods consumes the [`SelfieMut`].
+    /// This method consumes the [`SelfieMut`].
     ///
     /// # Example
     ///
@@ -688,11 +688,17 @@ where
     }
 
     /// Creates a new [`SelfieMut`] by consuming this [`SelfieMut`]'s reference type `R` and producing another
-    /// (`R2`), using a given closure.
+    /// (`R2`), using a given fallible closure.
     ///
     /// The owned pointer type `P` is left unchanged.
     ///
-    /// This methods consumes the [`SelfieMut`].
+    /// This method consumes the [`SelfieMut`].
+    ///
+    /// # Errors
+    ///
+    /// The closure can return a [`Result`] containing either the referential type, or any error type.
+    /// If the closure returns an `Err`, it will be returned in a [`SelfieError`] alongside the original
+    /// owned pointer type.
     ///
     /// # Example
     ///
