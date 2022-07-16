@@ -17,6 +17,7 @@ pub fn simple_map() {
     selfie.with_referential(|s| assert_eq!("world!", *s));
 }
 
+#[derive(Debug)]
 struct Dropper<'a> {
     value: &'a str,
 }
@@ -61,6 +62,23 @@ pub fn panic_with_dropped_value() {
         let _: Selfie<Box<str>, DropperRef> = data.map(|_, _| panic!("Haha"));
     })
     .unwrap_err();
+}
+
+#[test]
+pub fn error_with_dropped_value() {
+    let my_str = Pin::new("Hello".to_owned().into_boxed_str());
+    let data: Selfie<Box<str>, DropperRef> = Selfie::new(my_str, |value| Dropper { value });
+
+    assert_eq!("Hello", data.owned());
+    data.with_referential(|i| assert_eq!(&"Hello", &i.value));
+
+    // This should not lead to reading a moved value or anything
+    let owned = data
+        .try_map::<DropperRef, _, _>(|_, _| Err("Haha"))
+        .unwrap_err()
+        .owned;
+
+    assert_eq!("Hello", &*owned);
 }
 
 #[test]

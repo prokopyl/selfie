@@ -8,6 +8,7 @@
 
 use crate::refs::*;
 use crate::utils::*;
+use crate::SelfieError;
 use core::ops::DerefMut;
 use core::pin::Pin;
 use stable_deref_trait::{CloneStableDeref, StableDeref};
@@ -120,32 +121,36 @@ where
     /// # Errors
     ///
     /// The closure can return a Result containing either the referential type, or any error type.
-    /// If the closure returns an `Err`, it will be returned right away.
+    /// If the closure returns an `Err`, it will be returned right away, alongside the original
+    /// owned pointer type.
     ///
     /// # Example
     ///
     /// ```
     /// use std::pin::Pin;
     /// use selfie::refs::Ref;
-    /// use selfie::Selfie;
+    /// use selfie::{Selfie, SelfieError};
     ///
     /// let data = Pin::new("Hello, world!".to_owned());
-    /// let selfie: Result<Selfie<String, Ref<str>>, ()> = Selfie::try_new(data, |s| Ok(&s[0..5]));
+    /// let selfie: Result<Selfie<String, Ref<str>>, SelfieError<String, ()>>
+    ///     = Selfie::try_new(data, |s| Ok(&s[0..5]));
     ///
     /// assert_eq!("Hello", selfie.unwrap().referential());
     /// ```
     #[inline]
-    pub fn try_new<F, E>(owned: Pin<P>, handler: F) -> Result<Self, E>
+    pub fn try_new<E, F>(owned: Pin<P>, handler: F) -> Result<Self, SelfieError<P, E>>
     where
         F: for<'this> FnOnce(&'this P::Target) -> Result<<R as RefType<'this>>::Ref, E>,
     {
         // SAFETY: This type does not expose anything that could expose referential longer than owned exists
         let detached = unsafe { detach_lifetime(owned.as_ref()) }.get_ref();
 
-        Ok(Self {
-            referential: handler(detached)?,
-            owned,
-        })
+        let referential = match handler(detached) {
+            Ok(r) => r,
+            Err(error) => return Err(SelfieError { owned, error }),
+        };
+
+        Ok(Self { referential, owned })
     }
 
     /// Returns a shared reference to the owned type by de-referencing `P`.
@@ -284,6 +289,62 @@ where
         Selfie { owned, referential }
     }
 
+    /// Creates a new [`Selfie`] by consuming this [`Selfie`]'s reference type `R` and producing another
+    /// (`R2`), using a given fallible closure.
+    ///
+    /// The owned pointer type `P` is left unchanged, and a shared reference to the data behind it
+    /// is also provided to the closure for convenience.
+    ///
+    /// This methods consumes the [`Selfie`]. If you need to keep it intact, see
+    /// [`map_cloned`](Selfie::map_cloned).
+    ///
+    /// # Errors
+    ///
+    /// The closure can return a Result containing either the referential type, or any error type.
+    /// If the closure returns an `Err`, it will be returned right away, alongside the original
+    /// owned pointer type.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use std::pin::Pin;
+    /// use selfie::refs::Ref;
+    /// use selfie::{Selfie, SelfieError};
+    ///
+    /// let data = Pin::new("Hello, world!".to_owned());
+    /// let selfie: Selfie<String, Ref<str>> = Selfie::new(data, |str| &str[0..5]);
+    /// assert_eq!("Hello", selfie.referential());
+    ///
+    /// let selfie = selfie.try_map::<Ref<str>, (), _>(|str, _| Ok(&str[3..])).unwrap();
+    /// assert_eq!("lo", selfie.referential());
+    ///
+    /// let selfie: Result<Selfie<String, Ref<str>>, SelfieError<String,()>> = selfie.try_map(|_, owned| Ok(&owned[7..]));
+    /// assert_eq!("world!", selfie.unwrap().referential());
+    /// ```
+    #[inline]
+    pub fn try_map<R2: for<'this> RefType<'this>, E, F>(
+        self,
+        mapper: F,
+    ) -> Result<Selfie<'a, P, R2>, SelfieError<P, E>>
+    where
+        F: for<'this> FnOnce(
+            <R as RefType<'this>>::Ref,
+            &'this P::Target,
+        ) -> Result<<R2 as RefType<'this>>::Ref, E>,
+    {
+        // SAFETY: here we break the lifetime guarantees: we must be very careful to not drop owned before referential
+        let Self { owned, referential } = self;
+
+        // SAFETY: This type does not expose anything that could expose referential longer than owned exists
+        let detached = unsafe { detach_lifetime(owned.as_ref()) }.get_ref();
+        let referential = match mapper(referential, detached) {
+            Ok(r) => r,
+            Err(error) => return Err(SelfieError { owned, error }),
+        };
+
+        Ok(Selfie { owned, referential })
+    }
+
     /// Creates a new [`Selfie`] by cloning this [`Selfie`]'s reference pointer `P` and producing
     /// a new reference (`R2`), using a given closure.
     ///
@@ -327,6 +388,60 @@ where
         let referential = mapper(&self.referential, detached);
 
         Selfie { owned, referential }
+    }
+
+    /// Creates a new [`Selfie`] by cloning this [`Selfie`]'s reference pointer `P` and producing
+    /// a new reference (`R2`), using a given fallible closure.
+    ///
+    /// The owned pointer type `P` needs to be [`CloneStableDeref`](stable_deref_trait::CloneStableDeref),
+    /// as only the pointer itself is going to be cloned, not the data behind it. Both the current
+    /// reference `R` and the new `R2` will refer to the data behind `P`.
+    ///
+    /// This methods keeps the original [`Selfie`] unchanged, as only its owned pointer is cloned.
+    ///
+    /// # Errors
+    ///
+    /// The closure can return a Result containing either the referential type, or any error type.
+    /// If the closure returns an `Err`, it will be returned right away, alongside the original
+    /// owned pointer type.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use std::rc::Rc;
+    /// use selfie::refs::Ref;
+    /// use selfie::Selfie;
+    ///
+    /// let data = Rc::pin("Hello, world!".to_owned());
+    /// let selfie: Selfie<Rc<String>, Ref<str>> = Selfie::new(data, |str| &str[0..5]);
+    /// selfie.with_referential(|s| assert_eq!("Hello", *s));
+    ///
+    /// let second_selfie = selfie.try_map_cloned::<Ref<str>, (), _>(|str, _| Ok(&str[3..])).unwrap();
+    /// second_selfie.with_referential(|s| assert_eq!("lo", *s));
+    /// selfie.with_referential(|s| assert_eq!("Hello", *s)); // Old one still works
+    ///
+    /// drop(selfie);
+    /// second_selfie.with_referential(|s| assert_eq!("lo", *s)); // New one still works
+    /// ```
+    #[inline]
+    pub fn try_map_cloned<R2: for<'this> RefType<'this>, E, F>(
+        &self,
+        mapper: F,
+    ) -> Result<Selfie<'a, P, R2>, E>
+    where
+        F: for<'this> FnOnce(
+            &<R as RefType<'this>>::Ref,
+            &'this P::Target,
+        ) -> Result<<R2 as RefType<'this>>::Ref, E>,
+        P: CloneStableDeref,
+    {
+        let owned = self.owned.clone();
+
+        // SAFETY: This type does not expose anything that could expose referential longer than owned exists
+        let detached = unsafe { detach_lifetime(owned.as_ref()) }.get_ref();
+        let referential = mapper(&self.referential, detached)?;
+
+        Ok(Selfie { owned, referential })
     }
 }
 
@@ -392,7 +507,7 @@ where
     R: for<'this> RefType<'this>,
 {
     /// Creates a new [`SelfieMut`] from a pinned pointer `P`, and a closure to create the reference
-    /// type `R` from a shared reference to the data behind `P`.
+    /// type `R` from a pinned, exclusive reference to the data behind `P`.
     ///
     /// Note the closure cannot expect to be called with a specific lifetime, as it will handle
     /// the unnameable `'this` lifetime instead.
@@ -421,6 +536,46 @@ where
             referential: handler(detached),
             owned,
         }
+    }
+
+    /// Creates a new [`SelfieMut`] from a pinned pointer `P`, and a fallible closure to create the
+    /// reference type `R` from a pinned, exclusive reference to the data behind `P`.
+    ///
+    /// Note the closure cannot expect to be called with a specific lifetime, as it will handle
+    /// the unnameable `'this` lifetime instead.
+    ///
+    /// # Errors
+    ///
+    /// The closure can return a Result containing either the referential type, or any error type.
+    /// If the closure returns an `Err`, it will be returned right away.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use std::pin::Pin;
+    /// use selfie::refs::Mut;
+    /// use selfie::{SelfieError, SelfieMut};
+    ///
+    /// let data = Pin::new("Hello, world!".to_owned());
+    /// let selfie: Result<SelfieMut<String, Mut<str>>, SelfieError<String, ()>> =
+    ///     SelfieMut::try_new(data, |s| Ok(&mut Pin::into_inner(s)[0..5]));
+    ///
+    /// selfie.unwrap().with_referential(|r| assert_eq!("Hello", *r));
+    /// ```
+    #[inline]
+    pub fn try_new<E, F>(mut owned: Pin<P>, handler: F) -> Result<Self, SelfieError<P, E>>
+    where
+        F: for<'this> FnOnce(Pin<&'this mut P::Target>) -> Result<<R as RefType<'this>>::Ref, E>,
+    {
+        // SAFETY: This type does not expose anything that could expose referential longer than owned exists
+        let detached = unsafe { detach_lifetime_mut(owned.as_mut()) };
+
+        let referential = match handler(detached) {
+            Ok(r) => r,
+            Err(error) => return Err(SelfieError { owned, error }),
+        };
+
+        Ok(Self { referential, owned })
     }
 
     /// Performs an operation borrowing the referential type `R`, and returns its result.
@@ -530,5 +685,48 @@ where
         let referential = mapper(referential, &());
 
         Selfie { owned, referential }
+    }
+
+    /// Creates a new [`SelfieMut`] by consuming this [`SelfieMut`]'s reference type `R` and producing another
+    /// (`R2`), using a given closure.
+    ///
+    /// The owned pointer type `P` is left unchanged.
+    ///
+    /// This methods consumes the [`SelfieMut`].
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use std::pin::Pin;
+    /// use selfie::refs::Mut;
+    /// use selfie::SelfieMut;
+    ///
+    /// let data = Pin::new("Hello, world!".to_owned());
+    /// let selfie: SelfieMut<String, Mut<str>> = SelfieMut::new(data, |str| &mut Pin::into_inner(str)[0..5]);
+    /// selfie.with_referential(|s| assert_eq!("Hello", *s));
+    ///
+    /// let selfie = selfie.try_map::<Mut<str>, (), _>(|str, _| Ok(&mut str[3..])).unwrap();
+    /// selfie.with_referential(|s| assert_eq!("lo", *s));
+    /// ```
+    #[inline]
+    pub fn try_map<R2: for<'this> RefType<'this>, E, F>(
+        self,
+        mapper: F,
+    ) -> Result<Selfie<'a, P, R2>, SelfieError<P, E>>
+    where
+        F: for<'this> FnOnce(
+            <R as RefType<'this>>::Ref,
+            &'this (), // This is needed to constrain the lifetime TODO: find a way to remove this
+        ) -> Result<<R2 as RefType<'this>>::Ref, E>,
+    {
+        // SAFETY: here we break the lifetime guarantees: we must be very careful to not drop owned before referential
+        let Self { owned, referential } = self;
+
+        let referential = match mapper(referential, &()) {
+            Ok(r) => r,
+            Err(error) => return Err(SelfieError { owned, error }),
+        };
+
+        Ok(Selfie { owned, referential })
     }
 }

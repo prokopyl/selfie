@@ -7,6 +7,9 @@
 pub mod refs;
 pub(crate) mod utils;
 
+mod error;
+pub use error::*;
+
 mod selfie;
 pub use crate::selfie::*;
 
