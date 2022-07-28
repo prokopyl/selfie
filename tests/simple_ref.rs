@@ -10,12 +10,12 @@ pub fn simple_int() {
     let data: Selfie<Box<i32>, Ref<i32>> = Selfie::new(my_int, |i| i);
 
     assert_eq!(42, *data.owned());
-    assert_eq!(42, *data.referential());
+    assert_eq!(42, *data.with_referential(|r| *r));
 
     let data = Box::new(data);
 
     assert_eq!(42, *data.owned());
-    assert_eq!(42, *data.referential());
+    assert_eq!(42, *data.with_referential(|r| *r));
 }
 
 #[test]
@@ -24,12 +24,12 @@ pub fn simple_str() {
     let data: Selfie<String, Ref<str>> = Selfie::new(my_str, |i| &i[0..5]);
 
     assert_eq!("Hello, world!", data.owned());
-    assert_eq!("Hello", data.referential());
+    assert_eq!("Hello", data.with_referential(|r| *r));
 
     let data = Box::new(data);
 
     assert_eq!("Hello, world!", data.owned());
-    assert_eq!("Hello", data.referential());
+    assert_eq!("Hello", data.with_referential(|r| *r));
 }
 
 #[test]
@@ -38,12 +38,12 @@ pub fn different_int() {
     let data: Selfie<Arc<i32>, Ref<i32>> = Selfie::new(my_int, |i| i);
 
     assert_eq!(42, *data.owned());
-    assert_eq!(42, *data.referential());
+    assert_eq!(42, *data.with_referential(|r| *r));
 
     let data = Box::new(data);
 
     assert_eq!(42, *data.owned());
-    assert_eq!(42, *data.referential());
+    assert_eq!(42, *data.with_referential(|r| *r));
 }
 
 struct Point<'a> {
@@ -129,7 +129,7 @@ pub fn refcell() {
 
     let selfie = all_but_first_char(&refcell);
     assert!(refcell.try_borrow_mut().is_err());
-    assert_eq!("ello, world!", selfie.referential());
+    assert_eq!("ello, world!", selfie.with_referential(|r| *r));
     drop(selfie);
 
     assert!(refcell.try_borrow_mut().is_ok());

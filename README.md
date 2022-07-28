@@ -60,7 +60,7 @@ use selfie::{refs::Ref, Selfie};
 let data: Pin<String> = Pin::new("Hello, world!".to_owned());
 let selfie: Selfie<String, Ref<str>> = Selfie::new(data, |s| &s[0..5]);
 
-assert_eq!("Hello", selfie.referential());
+assert_eq!("Hello", selfie.with_referential(|r| *r));
 assert_eq!("Hello, world!", selfie.owned());
 ```
 
@@ -83,7 +83,7 @@ impl<'a> RefType<'a> for MyReferentialTypeStandIn {
 let data = Pin::new("Hello, world!".to_owned());
 let selfie: Selfie<String, MyReferentialTypeStandIn> = Selfie::new(data, |str| MyReferentialType(&str[0..5]));
 
-assert_eq!("Hello", selfie.referential().0);
+assert_eq!("Hello", selfie.with_referential(|r| *r).0);
 ```
 
 ### Mutable self-referential
@@ -118,6 +118,6 @@ let selfie: Selfie<String, SelfieRef<Ref<str>, Ref<str>>> = Selfie::new(data, |s
 assert_eq!("Hello, world!", selfie.owned());
 selfie.with_referential(|r| {
     assert_eq!("Hello", r.owned());
-    assert_eq!("lo", r.referential());
+    assert_eq!("lo", r.with_referential(|r| *r));
 });
 ```

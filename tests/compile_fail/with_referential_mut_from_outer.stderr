@@ -1,0 +1,11 @@
+error[E0597]: `new_string` does not live long enough
+  --> tests/compile_fail/with_referential_mut_from_outer.rs:13:47
+   |
+13 |         selfie.with_referential_mut(|s| *s = &new_string);
+   |                                     --- ------^^^^^^^^^^
+   |                                     |   |     |
+   |                                     |   |     borrowed value does not live long enough
+   |                                     |   assignment requires that `new_string` is borrowed for `'static`
+   |                                     value captured here
+14 |     }
+   |     - `new_string` dropped here while still borrowed

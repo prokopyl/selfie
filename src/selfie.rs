@@ -35,9 +35,7 @@ use stable_deref_trait::{CloneStableDeref, StableDeref};
 /// and [`with_referential_mut`](Selfie::with_referential_mut) methods, which hide its true lifetime.
 ///
 /// This is done because `R` actually has a self-referential lifetime, which cannot be named
-/// in Rust's current lifetime system. However, the [`referential`](Selfie::referential) method is
-/// also provided for convenience, which returns a copy of the referential type if it implements [`Copy`]
-/// (which is the case for simple references).
+/// in Rust's current lifetime system.
 ///
 /// Also because of the non-nameable self-referential lifetime, `R` is not the referential type
 /// itself, but a stand-in that implements [`RefType`] (e.g. [`Ref<T>`](Ref) instead of `&T`).
@@ -56,7 +54,7 @@ use stable_deref_trait::{CloneStableDeref, StableDeref};
 /// let data: Pin<String> = Pin::new("Hello, world!".to_owned());
 /// let selfie: Selfie<String, Ref<str>> = Selfie::new(data, |s| &s[0..5]);
 ///
-/// assert_eq!("Hello", selfie.referential());
+/// assert_eq!("Hello", selfie.with_referential(|r| *r));
 /// assert_eq!("Hello, world!", selfie.owned());
 /// ```
 pub struct Selfie<'a, P, R>
@@ -96,7 +94,7 @@ where
     /// let selfie: Selfie<String, Ref<str>> = Selfie::new(data, |s| &s[0..5]);
     ///
     /// // The selfie now contains both the String buffer and a subslice to "Hello"
-    /// assert_eq!("Hello", selfie.referential());
+    /// assert_eq!("Hello", selfie.with_referential(|r| *r));
     /// ```
     #[inline]
     pub fn new<F>(owned: Pin<P>, handler: F) -> Self
@@ -135,7 +133,7 @@ where
     /// let selfie: Result<Selfie<String, Ref<str>>, SelfieError<String, ()>>
     ///     = Selfie::try_new(data, |s| Ok(&s[0..5]));
     ///
-    /// assert_eq!("Hello", selfie.unwrap().referential());
+    /// assert_eq!("Hello", selfie.unwrap().with_referential(|r| *r));
     /// ```
     #[inline]
     pub fn try_new<E, F>(owned: Pin<P>, handler: F) -> Result<Self, SelfieError<P, E>>
@@ -187,7 +185,7 @@ where
     #[inline]
     pub fn with_referential<'s, F, T>(&'s self, handler: F) -> T
     where
-        F: for<'this> FnOnce(&'this <R as RefType<'s>>::Ref) -> T,
+        F: for<'this> FnOnce(&'s <R as RefType<'this>>::Ref) -> T,
     {
         // SAFETY: Down-casting is safe here, because Ref is actually 's, not 'a
         let referential = unsafe { downcast_ref::<'s, 'a, R>(&self.referential) };
@@ -208,17 +206,17 @@ where
     /// let data: Pin<String> = Pin::new("Hello, world!".to_owned());
     /// let mut selfie: Selfie<String, Ref<str>> = Selfie::new(data, |s| &s[0..5]);
     ///
-    /// assert_eq!("Hello", selfie.referential());
+    /// assert_eq!("Hello", selfie.with_referential(|r| *r));
     /// assert_eq!("Hello, world!", selfie.owned());
     ///
     /// selfie.with_referential_mut(|s| *s = &s[0..2]);
     ///
-    /// assert_eq!("He", selfie.referential());
+    /// assert_eq!("He", selfie.with_referential(|r| *r));
     /// assert_eq!("Hello, world!", selfie.owned());
     #[inline]
     pub fn with_referential_mut<'s, F, T>(&'s mut self, handler: F) -> T
     where
-        F: for<'this> FnOnce(&'this mut <R as RefType<'s>>::Ref) -> T,
+        F: for<'this> FnOnce(&'s mut <R as RefType<'this>>::Ref) -> T,
     {
         // SAFETY: Down-casting is safe here, because Ref is actually 's, not 'a
         let referential = unsafe { downcast_mut::<'s, 'a, R>(&mut self.referential) };
@@ -263,13 +261,13 @@ where
     ///
     /// let data = Pin::new("Hello, world!".to_owned());
     /// let selfie: Selfie<String, Ref<str>> = Selfie::new(data, |str| &str[0..5]);
-    /// assert_eq!("Hello", selfie.referential());
+    /// assert_eq!("Hello", selfie.with_referential(|r| *r));
     ///
     /// let selfie = selfie.map::<Ref<str>, _>(|str, _| &str[3..]);
-    /// assert_eq!("lo", selfie.referential());
+    /// assert_eq!("lo", selfie.with_referential(|r| *r));
     ///
     /// let selfie: Selfie<String, Ref<str>> = selfie.map(|_, owned| &owned[7..]);
-    /// assert_eq!("world!", selfie.referential());
+    /// assert_eq!("world!", selfie.with_referential(|r| *r));
     /// ```
     #[inline]
     pub fn map<R2: for<'this> RefType<'this>, F>(self, mapper: F) -> Selfie<'a, P, R2>
@@ -313,13 +311,13 @@ where
     ///
     /// let data = Pin::new("Hello, world!".to_owned());
     /// let selfie: Selfie<String, Ref<str>> = Selfie::new(data, |str| &str[0..5]);
-    /// assert_eq!("Hello", selfie.referential());
+    /// assert_eq!("Hello", selfie.with_referential(|r| *r));
     ///
     /// let selfie = selfie.try_map::<Ref<str>, (), _>(|str, _| Ok(&str[3..])).unwrap();
-    /// assert_eq!("lo", selfie.referential());
+    /// assert_eq!("lo", selfie.with_referential(|r| *r));
     ///
     /// let selfie: Result<Selfie<String, Ref<str>>, SelfieError<String,()>> = selfie.try_map(|_, owned| Ok(&owned[7..]));
-    /// assert_eq!("world!", selfie.unwrap().referential());
+    /// assert_eq!("world!", selfie.unwrap().with_referential(|r| *r));
     /// ```
     #[inline]
     pub fn try_map<R2: for<'this> RefType<'this>, E, F>(
@@ -466,9 +464,7 @@ where
 /// and [`with_referential_mut`](SelfieMut::with_referential_mut) methods, which hide its true lifetime.
 ///
 /// This is done because `R` actually has a self-referential lifetime, which cannot be named
-/// in Rust's current lifetime system. However, the [`referential`](Selfie::referential) method is
-/// also provided for convenience, which returns a copy of the referential type if it implements [`Copy`]
-/// (which is the case for simple references).
+/// in Rust's current lifetime system.
 ///
 /// Also because of the non-nameable self-referential lifetime, `R` is not the referential type
 /// itself, but a stand-in that implements [`RefType`] (e.g. [`Ref<T>`](Ref) instead of `&T`).
@@ -487,7 +483,7 @@ where
 /// let data: Pin<String> = Pin::new("Hello, world!".to_owned());
 /// let selfie: Selfie<String, Ref<str>> = Selfie::new(data, |s| &s[0..5]);
 ///
-/// assert_eq!("Hello", selfie.referential());
+/// assert_eq!("Hello", selfie.with_referential(|r| *r));
 /// assert_eq!("Hello, world!", selfie.owned());
 /// ```
 pub struct SelfieMut<'a, P, R>
@@ -594,7 +590,7 @@ where
     #[inline]
     pub fn with_referential<'s, F, T>(&'s self, handler: F) -> T
     where
-        F: for<'this> FnOnce(&'this <R as RefType<'s>>::Ref) -> T,
+        F: for<'this> FnOnce(&'s <R as RefType<'this>>::Ref) -> T,
     {
         // SAFETY: Down-casting is safe here, because Ref is actually 's, not 'a
         let referential = unsafe { downcast_ref::<'s, 'a, R>(&self.referential) };
@@ -623,7 +619,7 @@ where
     #[inline]
     pub fn with_referential_mut<'s, F, T>(&'s mut self, handler: F) -> T
     where
-        F: for<'this> FnOnce(&'this mut <R as RefType<'s>>::Ref) -> T,
+        F: for<'this> FnOnce(&'s mut <R as RefType<'this>>::Ref) -> T,
     {
         // SAFETY: Down-casting is safe here, because Ref is actually 's, not 'a
         let referential = unsafe { downcast_mut::<'s, 'a, R>(&mut self.referential) };

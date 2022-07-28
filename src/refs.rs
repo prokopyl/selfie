@@ -40,7 +40,7 @@ use core::pin::Pin;
 /// let data = Pin::new("Hello, world!".to_owned());
 /// let selfie: Selfie<String, MyReferentialTypeStandIn> = Selfie::new(data, |str| MyReferentialType(&str[0..5]));
 ///
-/// assert_eq!("Hello", selfie.referential().0);
+/// assert_eq!("Hello", selfie.with_referential(|r| *r).0);
 /// ```
 ///
 /// Here is a dummy example showing how [`RefType`] stand-ins are used internally:
@@ -71,7 +71,7 @@ pub trait RefType<'a> {
 /// let data = Pin::new("Hello, world!".to_owned());
 /// let selfie: Selfie<String, Ref<str>> = Selfie::new(data, |str| &str[0..5]);
 ///
-/// assert_eq!("Hello", selfie.referential());
+/// assert_eq!("Hello", selfie.with_referential(|r| *r));
 /// ```
 pub struct Ref<T: ?Sized>(PhantomData<T>);
 
@@ -118,7 +118,7 @@ impl<'a, T: 'a + ?Sized> RefType<'a> for Mut<T> {
 /// assert_eq!("Hello, world!", selfie.owned());
 /// selfie.with_referential(|r| {
 ///     assert_eq!("Hello", r.owned());
-///     assert_eq!("lo", r.referential());
+///     assert_eq!("lo", r.with_referential(|r| *r));
 /// });
 /// ```
 pub struct SelfieRef<P, R>(PhantomData<P>, PhantomData<R>)
