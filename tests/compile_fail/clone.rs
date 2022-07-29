@@ -1,4 +1,3 @@
-use core::pin::Pin;
 use selfie::refs::RefType;
 use selfie::Selfie;
 
@@ -14,7 +13,7 @@ impl<'a> RefType<'a> for StrRefType {
 }
 
 pub fn main() {
-    let data = Pin::new("hi".to_owned());
+    let data = "hi".to_owned();
     let selfie: Selfie<String, StrRefType> = Selfie::new(data, |inner| StrRef { inner });
 
     let cloned = selfie.with_referential(|r| r.clone());

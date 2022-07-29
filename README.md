@@ -26,13 +26,13 @@ There are other self-referential struct libraries out there, but these didn't qu
   `Selfie` structs store the owned pointer and the referential type right next to each other, so the
   only indirection is the one from the already existing Owned pointer. This also means the `Selfie` library is entirely `#![no_std]`.
 * **Few restrictions for the Owned type**: The only requirement for the Owned type is to be behind a pointer that is
-  both Pin-able and stable (i.e. implementing [`StableDeref`](https://docs.rs/stable_deref_trait/latest/stable_deref_trait/trait.StableDeref.html)).
+  stable (i.e. implementing [`StableDeref`](https://docs.rs/stable_deref_trait/latest/stable_deref_trait/trait.StableDeref.html)).
   Candidates from the standard library include `&T`, `&mut T`, `Box`, `Rc`, `Arc`, `String`, `Vec` and others, but any
   pointer provided by an external library such as [basedrop](https://crates.io/crates/basedrop) is also inherently supported.
 * **No restrictions for the Referential types**: `Selfie` can be used with any type that has a lifetime relationship
   to the owned type, including any of your custom types (with a bit of boilerplate however, see the examples below).
 * **Support for mutable self-references**: `Selfie` also has a `SelfieMut` variant, which allows the referential to be
-  constructed with a pinned mutable reference instead of a simple shared reference.
+  constructed with a mutable reference instead of a simple shared reference.
 * **Support for non-static pointers**: `Selfie` can be tied to any lifetime, allowing the "Owned" pointer to be also
   borrowing something else.
 * **Support for cascading self-references**: Because `Selfie`s can be non-static, and there are no restrictions on
@@ -54,10 +54,9 @@ There are other self-referential struct libraries out there, but these didn't qu
 ### Caching `String` subslices
 
 ```rust
-use core::pin::Pin;
 use selfie::{refs::Ref, Selfie};
 
-let data: Pin<String> = Pin::new("Hello, world!".to_owned());
+let data: String = "Hello, world!".to_owned();
 let selfie: Selfie<String, Ref<str>> = Selfie::new(data, |s| &s[0..5]);
 
 assert_eq!("Hello", selfie.with_referential(|r| *r));
@@ -67,7 +66,6 @@ assert_eq!("Hello, world!", selfie.owned());
 ### Using custom referential types
 
 ```rust
-use std::pin::Pin;
 use selfie::{refs::RefType, Selfie};
 
 #[derive(Copy, Clone)]
@@ -80,7 +78,7 @@ impl<'a> RefType<'a> for MyReferentialTypeStandIn {
 }
 
 // MyReferentialType can now be used in Selfies!
-let data = Pin::new("Hello, world!".to_owned());
+let data = "Hello, world!".to_owned();
 let selfie: Selfie<String, MyReferentialTypeStandIn> = Selfie::new(data, |str| MyReferentialType(&str[0..5]));
 
 assert_eq!("Hello", selfie.with_referential(|r| *r).0);
@@ -88,31 +86,28 @@ assert_eq!("Hello", selfie.with_referential(|r| *r).0);
 
 ### Mutable self-referential
 ```rust
-use core::pin::Pin;
 use selfie::{refs::Mut, SelfieMut};
 
-let data: Pin<String> = Pin::new("Hello, world!".to_owned());
-let mut selfie: SelfieMut<String, Mut<str>> = SelfieMut::new(data, |s| &mut Pin::into_inner(s)[0..5]);
+let data: String = "Hello, world!".to_owned();
+let mut selfie: SelfieMut<String, Mut<str>> = SelfieMut::new(data, |s| &mut s[0..5]);
 
 selfie.with_referential_mut(|s| s.make_ascii_uppercase());
 selfie.with_referential(|s| assert_eq!("HELLO", *s));
 
 // By dropping the referential part, we get back the access to the owned data
-let data: String = Pin::into_inner(selfie.into_owned());
+let data: String = selfie.into_owned();
 assert_eq!("HELLO, world!", &data);
 ```
 
 ### Cascading Selfies
 
 ```rust
-use std::pin::Pin;
 use selfie::refs::{Ref, SelfieRef};
 use selfie::Selfie;
 
-let data = Pin::new("Hello, world!".to_owned());
+let data = "Hello, world!".to_owned();
 let selfie: Selfie<String, SelfieRef<Ref<str>, Ref<str>>> = Selfie::new(data, |str| {
-    let substr = Pin::new(&str[0..5]);
-    Selfie::new(substr, |str| &str[3..])
+    Selfie::new(&str[0..5], |str| &str[3..])
 });
 
 assert_eq!("Hello, world!", selfie.owned());

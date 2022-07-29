@@ -10,17 +10,16 @@ use crate::refs::*;
 use crate::utils::*;
 use crate::SelfieError;
 use core::ops::DerefMut;
-use core::pin::Pin;
 use stable_deref_trait::{CloneStableDeref, StableDeref};
 
-/// A self-referential struct with a shared reference (`R`) to an object owned by a pinned pointer (`P`).
+/// A self-referential struct with a shared reference (`R`) to an object owned by a pointer (`P`).
 ///
 /// If you need a self-referential struct with an exclusive (mutable) reference to the data behind `P`, see [`SelfieMut`].
 ///
-/// This struct is a simple wrapper containing both the pinned pointer `P` and the shared reference to it `R` alongside it.
+/// This struct is a simple wrapper containing both the pointer `P` and the shared reference to it `R` alongside it.
 /// It does not perform any additional kind of boxing or allocation.
 ///
-/// A [`Selfie`] is constructed by using the [`new`](Selfie::new) constructor, which requires the pinned pointer `P`,
+/// A [`Selfie`] is constructed by using the [`new`](Selfie::new) constructor, which requires the pointer `P`,
 /// and a function to create the reference type `R` from a shared reference to the data behind `P`.
 ///
 /// Because `R` references the data behind `P` for as long as this struct exists, the data behind `P`
@@ -48,10 +47,9 @@ use stable_deref_trait::{CloneStableDeref, StableDeref};
 /// into it.
 ///
 /// ```
-/// use core::pin::Pin;
 /// use selfie::{refs::Ref, Selfie};
 ///
-/// let data: Pin<String> = Pin::new("Hello, world!".to_owned());
+/// let data: String = "Hello, world!".to_owned();
 /// let selfie: Selfie<String, Ref<str>> = Selfie::new(data, |s| &s[0..5]);
 ///
 /// assert_eq!("Hello", selfie.with_referential(|r| *r));
@@ -68,7 +66,7 @@ where
     // It is *absolutely* unsound to ever use this field as 'a, it should immediately be casted
     // to and from 'this instead.
     referential: <R as RefType<'a>>::Ref,
-    owned: Pin<P>,
+    owned: P,
 }
 
 impl<'a, P, R> Selfie<'a, P, R>
@@ -77,7 +75,7 @@ where
     R: for<'this> RefType<'this>,
     P::Target: 'a,
 {
-    /// Creates a new [`Selfie`] from a pinned pointer `P`, and a closure to create the reference
+    /// Creates a new [`Selfie`] from a pointer `P`, and a closure to create the reference
     /// type `R` from a shared reference to the data behind `P`.
     ///
     /// Note the closure cannot expect to be called with a specific lifetime, as it will handle
@@ -86,23 +84,22 @@ where
     /// # Example
     ///
     /// ```
-    /// use std::pin::Pin;
     /// use selfie::refs::Ref;
     /// use selfie::Selfie;
     ///
-    /// let data = Pin::new("Hello, world!".to_owned());
+    /// let data = "Hello, world!".to_owned();
     /// let selfie: Selfie<String, Ref<str>> = Selfie::new(data, |s| &s[0..5]);
     ///
     /// // The selfie now contains both the String buffer and a subslice to "Hello"
     /// assert_eq!("Hello", selfie.with_referential(|r| *r));
     /// ```
     #[inline]
-    pub fn new<F>(owned: Pin<P>, handler: F) -> Self
+    pub fn new<F>(owned: P, handler: F) -> Self
     where
         F: for<'this> FnOnce(&'this P::Target) -> <R as RefType<'this>>::Ref,
     {
         // SAFETY: This type does not expose anything that could expose referential longer than owned exists
-        let detached = unsafe { detach_lifetime(owned.as_ref()) }.get_ref();
+        let detached = unsafe { detach_lifetime(owned.deref()) };
 
         Self {
             referential: handler(detached),
@@ -110,7 +107,7 @@ where
         }
     }
 
-    /// Creates a new [`Selfie`] from a pinned pointer `P`, and a fallible closure to create the
+    /// Creates a new [`Selfie`] from a pointer `P`, and a fallible closure to create the
     /// reference type `R` from a shared reference to the data behind `P`.
     ///
     /// Note the closure cannot expect to be called with a specific lifetime, as it will handle
@@ -125,23 +122,22 @@ where
     /// # Example
     ///
     /// ```
-    /// use std::pin::Pin;
     /// use selfie::refs::Ref;
     /// use selfie::{Selfie, SelfieError};
     ///
-    /// let data = Pin::new("Hello, world!".to_owned());
+    /// let data = "Hello, world!".to_owned();
     /// let selfie: Result<Selfie<String, Ref<str>>, SelfieError<String, ()>>
     ///     = Selfie::try_new(data, |s| Ok(&s[0..5]));
     ///
     /// assert_eq!("Hello", selfie.unwrap().with_referential(|r| *r));
     /// ```
     #[inline]
-    pub fn try_new<E, F>(owned: Pin<P>, handler: F) -> Result<Self, SelfieError<P, E>>
+    pub fn try_new<E, F>(owned: P, handler: F) -> Result<Self, SelfieError<P, E>>
     where
         F: for<'this> FnOnce(&'this P::Target) -> Result<<R as RefType<'this>>::Ref, E>,
     {
         // SAFETY: This type does not expose anything that could expose referential longer than owned exists
-        let detached = unsafe { detach_lifetime(owned.as_ref()) }.get_ref();
+        let detached = unsafe { detach_lifetime(owned.deref()) };
 
         let referential = match handler(detached) {
             Ok(r) => r,
@@ -156,17 +152,16 @@ where
     /// # Example
     ///
     /// ```
-    /// use core::pin::Pin;
     /// use selfie::{refs::Ref, Selfie};
     ///
-    /// let data: Pin<Box<u32>> = Box::pin(42);
+    /// let data: Box<u32> = Box::new(42);
     /// let selfie: Selfie<Box<u32>, Ref<u32>> = Selfie::new(data, |i| i);
     ///
     /// assert_eq!(&42, selfie.owned());
     /// ```
     #[inline]
     pub fn owned(&self) -> &P::Target {
-        self.owned.as_ref().get_ref()
+        self.owned.deref()
     }
 
     /// Performs an operation borrowing the referential type `R`, and returns its result.
@@ -174,10 +169,9 @@ where
     /// # Example
     ///
     /// ```
-    /// use core::pin::Pin;
     /// use selfie::{refs::Ref, Selfie};
     ///
-    /// let data: Pin<Box<u32>> = Box::pin(42);
+    /// let data: Box<u32> = Box::new(42);
     /// let selfie: Selfie<Box<u32>, Ref<u32>> = Selfie::new(data, |i| i);
     ///
     /// assert_eq!(50, selfie.with_referential(|r| *r + 8));
@@ -200,10 +194,9 @@ where
     /// # Example
     ///
     /// ```
-    /// use core::pin::Pin;
     /// use selfie::{refs::Ref, Selfie};
     ///
-    /// let data: Pin<String> = Pin::new("Hello, world!".to_owned());
+    /// let data: String = "Hello, world!".to_owned();
     /// let mut selfie: Selfie<String, Ref<str>> = Selfie::new(data, |s| &s[0..5]);
     ///
     /// assert_eq!("Hello", selfie.with_referential(|r| *r));
@@ -228,18 +221,17 @@ where
     ///
     /// # Example
     /// ```
-    /// use std::pin::Pin;
     /// use selfie::refs::Ref;
     /// use selfie::Selfie;
     ///
-    /// let data = Pin::new("Hello, world!".to_owned());
+    /// let data = "Hello, world!".to_owned();
     /// let selfie: Selfie<String, Ref<str>> = Selfie::new(data, |str| &str[0..5]);
     ///
-    /// let original_data: Pin<String> = selfie.into_owned();
-    /// assert_eq!("Hello, world!", original_data.as_ref().get_ref());
+    /// let original_data: String = selfie.into_owned();
+    /// assert_eq!("Hello, world!", &original_data);
     /// ```
     #[inline]
-    pub fn into_owned(self) -> Pin<P> {
+    pub fn into_owned(self) -> P {
         self.owned
     }
 
@@ -255,11 +247,10 @@ where
     /// # Example
     ///
     /// ```
-    /// use std::pin::Pin;
     /// use selfie::refs::Ref;
     /// use selfie::Selfie;
     ///
-    /// let data = Pin::new("Hello, world!".to_owned());
+    /// let data = "Hello, world!".to_owned();
     /// let selfie: Selfie<String, Ref<str>> = Selfie::new(data, |str| &str[0..5]);
     /// assert_eq!("Hello", selfie.with_referential(|r| *r));
     ///
@@ -281,7 +272,7 @@ where
         let Self { owned, referential } = self;
 
         // SAFETY: This type does not expose anything that could expose referential longer than owned exists
-        let detached = unsafe { detach_lifetime(owned.as_ref()) }.get_ref();
+        let detached = unsafe { detach_lifetime(&owned) };
         let referential = mapper(referential, detached);
 
         Selfie { owned, referential }
@@ -305,11 +296,10 @@ where
     /// # Example
     ///
     /// ```
-    /// use std::pin::Pin;
     /// use selfie::refs::Ref;
     /// use selfie::{Selfie, SelfieError};
     ///
-    /// let data = Pin::new("Hello, world!".to_owned());
+    /// let data = "Hello, world!".to_owned();
     /// let selfie: Selfie<String, Ref<str>> = Selfie::new(data, |str| &str[0..5]);
     /// assert_eq!("Hello", selfie.with_referential(|r| *r));
     ///
@@ -334,7 +324,7 @@ where
         let Self { owned, referential } = self;
 
         // SAFETY: This type does not expose anything that could expose referential longer than owned exists
-        let detached = unsafe { detach_lifetime(owned.as_ref()) }.get_ref();
+        let detached = unsafe { detach_lifetime(&owned) };
         let referential = match mapper(referential, detached) {
             Ok(r) => r,
             Err(error) => return Err(SelfieError { owned, error }),
@@ -359,7 +349,7 @@ where
     /// use selfie::refs::Ref;
     /// use selfie::Selfie;
     ///
-    /// let data = Rc::pin("Hello, world!".to_owned());
+    /// let data = Rc::new("Hello, world!".to_owned());
     /// let selfie: Selfie<Rc<String>, Ref<str>> = Selfie::new(data, |str| &str[0..5]);
     /// selfie.with_referential(|s| assert_eq!("Hello", *s));
     ///
@@ -382,7 +372,7 @@ where
         let owned = self.owned.clone();
 
         // SAFETY: This type does not expose anything that could expose referential longer than owned exists
-        let detached = unsafe { detach_lifetime(owned.as_ref()) }.get_ref();
+        let detached = unsafe { detach_lifetime(&owned) };
         let referential = mapper(&self.referential, detached);
 
         Selfie { owned, referential }
@@ -409,7 +399,7 @@ where
     /// use selfie::refs::Ref;
     /// use selfie::Selfie;
     ///
-    /// let data = Rc::pin("Hello, world!".to_owned());
+    /// let data = Rc::new("Hello, world!".to_owned());
     /// let selfie: Selfie<Rc<String>, Ref<str>> = Selfie::new(data, |str| &str[0..5]);
     /// selfie.with_referential(|s| assert_eq!("Hello", *s));
     ///
@@ -435,22 +425,22 @@ where
         let owned = self.owned.clone();
 
         // SAFETY: This type does not expose anything that could expose referential longer than owned exists
-        let detached = unsafe { detach_lifetime(owned.as_ref()) }.get_ref();
+        let detached = unsafe { detach_lifetime(&owned) };
         let referential = mapper(&self.referential, detached)?;
 
         Ok(Selfie { owned, referential })
     }
 }
 
-/// A self-referential struct with a mutable reference (`R`) to an object owned by a pinned pointer (`P`).
+/// A self-referential struct with a mutable reference (`R`) to an object owned by a pointer (`P`).
 ///
 /// If you only need a self-referential struct with an shared reference to the data behind `P`, see [`Selfie`].
 ///
-/// This struct is a simple wrapper containing both the pinned pointer `P` and the mutable reference to it `R` alongside it.
+/// This struct is a simple wrapper containing both the pointer `P` and the mutable reference to it `R` alongside it.
 /// It does not perform any additional kind of boxing or allocation.
 ///
-/// A [`SelfieMut`] is constructed by using the [`new`](SelfieMut::new) constructor, which requires the pinned pointer `P`,
-/// and a function to create the reference type `R` from a pinned mutable reference to the data behind `P`.
+/// A [`SelfieMut`] is constructed by using the [`new`](SelfieMut::new) constructor, which requires the pointer `P`,
+/// and a function to create the reference type `R` from a mutable reference to the data behind `P`.
 ///
 /// Because `R` references the data behind `P` for as long as this struct exists, the data behind `P`
 /// has to be considered to be exclusively borrowed for the lifetime of the [`SelfieMut`].
@@ -477,10 +467,9 @@ where
 /// into it.
 ///
 /// ```
-/// use core::pin::Pin;
 /// use selfie::{refs::Ref, Selfie};
 ///
-/// let data: Pin<String> = Pin::new("Hello, world!".to_owned());
+/// let data: String = "Hello, world!".to_owned();
 /// let selfie: Selfie<String, Ref<str>> = Selfie::new(data, |s| &s[0..5]);
 ///
 /// assert_eq!("Hello", selfie.with_referential(|r| *r));
@@ -493,7 +482,7 @@ where
 {
     // SAFETY: enforce drop order!
     referential: <R as RefType<'a>>::Ref,
-    owned: Pin<P>,
+    owned: P,
 }
 
 impl<'a, P, R> SelfieMut<'a, P, R>
@@ -501,8 +490,8 @@ where
     P: StableDeref + DerefMut + 'a,
     R: for<'this> RefType<'this>,
 {
-    /// Creates a new [`SelfieMut`] from a pinned pointer `P`, and a closure to create the reference
-    /// type `R` from a pinned, exclusive reference to the data behind `P`.
+    /// Creates a new [`SelfieMut`] from a pointer `P`, and a closure to create the reference
+    /// type `R` from a, exclusive reference to the data behind `P`.
     ///
     /// Note the closure cannot expect to be called with a specific lifetime, as it will handle
     /// the unnameable `'this` lifetime instead.
@@ -510,22 +499,21 @@ where
     /// # Example
     ///
     /// ```
-    /// use std::pin::Pin;
     /// use selfie::refs::Mut;
     /// use selfie::SelfieMut;
     ///
-    /// let data = Pin::new("Hello, world!".to_owned());
-    /// let selfie: SelfieMut<String, Mut<str>> = SelfieMut::new(data, |s| &mut Pin::into_inner(s)[0..5]);
+    /// let data = "Hello, world!".to_owned();
+    /// let selfie: SelfieMut<String, Mut<str>> = SelfieMut::new(data, |s| &mut s[0..5]);
     ///
     /// // The selfie now contains both the String buffer and a subslice to "Hello"
     /// selfie.with_referential(|r| assert_eq!("Hello", *r));
     /// ```
-    pub fn new<F>(mut owned: Pin<P>, handler: F) -> Self
+    pub fn new<F>(mut owned: P, handler: F) -> Self
     where
-        F: for<'this> FnOnce(Pin<&'this mut P::Target>) -> <R as RefType<'this>>::Ref,
+        F: for<'this> FnOnce(&'this mut P::Target) -> <R as RefType<'this>>::Ref,
     {
         // SAFETY: This type does not expose anything that could expose referential longer than owned exists
-        let detached = unsafe { detach_lifetime_mut(owned.as_mut()) };
+        let detached = unsafe { detach_lifetime_mut(owned.deref_mut()) };
 
         Self {
             referential: handler(detached),
@@ -533,8 +521,8 @@ where
         }
     }
 
-    /// Creates a new [`SelfieMut`] from a pinned pointer `P`, and a fallible closure to create the
-    /// reference type `R` from a pinned, exclusive reference to the data behind `P`.
+    /// Creates a new [`SelfieMut`] from a pointer `P`, and a fallible closure to create the
+    /// reference type `R` from an exclusive reference to the data behind `P`.
     ///
     /// Note the closure cannot expect to be called with a specific lifetime, as it will handle
     /// the unnameable `'this` lifetime instead.
@@ -548,23 +536,22 @@ where
     /// # Example
     ///
     /// ```
-    /// use std::pin::Pin;
     /// use selfie::refs::Mut;
     /// use selfie::{SelfieError, SelfieMut};
     ///
-    /// let data = Pin::new("Hello, world!".to_owned());
+    /// let data = "Hello, world!".to_owned();
     /// let selfie: Result<SelfieMut<String, Mut<str>>, SelfieError<String, ()>> =
-    ///     SelfieMut::try_new(data, |s| Ok(&mut Pin::into_inner(s)[0..5]));
+    ///     SelfieMut::try_new(data, |s| Ok(&mut s[0..5]));
     ///
     /// selfie.unwrap().with_referential(|r| assert_eq!("Hello", *r));
     /// ```
     #[inline]
-    pub fn try_new<E, F>(mut owned: Pin<P>, handler: F) -> Result<Self, SelfieError<P, E>>
+    pub fn try_new<E, F>(mut owned: P, handler: F) -> Result<Self, SelfieError<P, E>>
     where
-        F: for<'this> FnOnce(Pin<&'this mut P::Target>) -> Result<<R as RefType<'this>>::Ref, E>,
+        F: for<'this> FnOnce(&'this mut P::Target) -> Result<<R as RefType<'this>>::Ref, E>,
     {
         // SAFETY: This type does not expose anything that could expose referential longer than owned exists
-        let detached = unsafe { detach_lifetime_mut(owned.as_mut()) };
+        let detached = unsafe { detach_lifetime_mut(&mut owned) };
 
         let referential = match handler(detached) {
             Ok(r) => r,
@@ -579,11 +566,10 @@ where
     /// # Example
     ///
     /// ```
-    /// use core::pin::Pin;
     /// use selfie::{refs::Mut, SelfieMut};
     ///
-    /// let data: Pin<Box<u32>> = Box::pin(42);
-    /// let selfie: SelfieMut<Box<u32>, Mut<u32>> = SelfieMut::new(data, |i| Pin::into_inner(i));
+    /// let data: Box<u32> = Box::new(42);
+    /// let selfie: SelfieMut<Box<u32>, Mut<u32>> = SelfieMut::new(data, |i| i);
     ///
     /// assert_eq!(50, selfie.with_referential(|r| **r + 8));
     /// ```
@@ -604,16 +590,15 @@ where
     /// # Example
     ///
     /// ```
-    /// use core::pin::Pin;
     /// use selfie::{refs::Mut, SelfieMut};
     ///
-    /// let data: Pin<String> = Pin::new("Hello, world!".to_owned());
-    /// let mut selfie: SelfieMut<String, Mut<str>> = SelfieMut::new(data, |s| &mut Pin::into_inner(s)[0..5]);
+    /// let data: String = "Hello, world!".to_owned();
+    /// let mut selfie: SelfieMut<String, Mut<str>> = SelfieMut::new(data, |s| &mut s[0..5]);
     ///
     /// selfie.with_referential_mut(|s| s.make_ascii_uppercase());
     /// selfie.with_referential(|s| assert_eq!("HELLO", *s));
     ///
-    /// let data = Pin::into_inner(selfie.into_owned());
+    /// let data = selfie.into_owned();
     /// assert_eq!("HELLO, world!", &data);
     /// ```
     #[inline]
@@ -631,18 +616,17 @@ where
     ///
     /// # Example
     /// ```
-    /// use std::pin::Pin;
     /// use selfie::refs::Mut;
     /// use selfie::SelfieMut;
     ///
-    /// let data = Pin::new("Hello, world!".to_owned());
-    /// let selfie: SelfieMut<String, Mut<str>> = SelfieMut::new(data, |str| &mut Pin::into_inner(str)[0..5]);
+    /// let data = "Hello, world!".to_owned();
+    /// let selfie: SelfieMut<String, Mut<str>> = SelfieMut::new(data, |str| &mut str[0..5]);
     ///
-    /// let original_data: Pin<String> = selfie.into_owned();
-    /// assert_eq!("Hello, world!", original_data.as_ref().get_ref());
+    /// let original_data: String = selfie.into_owned();
+    /// assert_eq!("Hello, world!", &original_data);
     /// ```
     #[inline]
-    pub fn into_owned(self) -> Pin<P> {
+    pub fn into_owned(self) -> P {
         self.owned
     }
 
@@ -656,12 +640,11 @@ where
     /// # Example
     ///
     /// ```
-    /// use std::pin::Pin;
     /// use selfie::refs::Mut;
     /// use selfie::SelfieMut;
     ///
-    /// let data = Pin::new("Hello, world!".to_owned());
-    /// let selfie: SelfieMut<String, Mut<str>> = SelfieMut::new(data, |str| &mut Pin::into_inner(str)[0..5]);
+    /// let data = "Hello, world!".to_owned();
+    /// let selfie: SelfieMut<String, Mut<str>> = SelfieMut::new(data, |str| &mut str[0..5]);
     /// selfie.with_referential(|s| assert_eq!("Hello", *s));
     ///
     /// let selfie = selfie.map::<Mut<str>, _>(|str, _| &mut str[3..]);
@@ -699,12 +682,11 @@ where
     /// # Example
     ///
     /// ```
-    /// use std::pin::Pin;
     /// use selfie::refs::Mut;
     /// use selfie::SelfieMut;
     ///
-    /// let data = Pin::new("Hello, world!".to_owned());
-    /// let selfie: SelfieMut<String, Mut<str>> = SelfieMut::new(data, |str| &mut Pin::into_inner(str)[0..5]);
+    /// let data = "Hello, world!".to_owned();
+    /// let selfie: SelfieMut<String, Mut<str>> = SelfieMut::new(data, |str| &mut str[0..5]);
     /// selfie.with_referential(|s| assert_eq!("Hello", *s));
     ///
     /// let selfie = selfie.try_map::<Mut<str>, (), _>(|str, _| Ok(&mut str[3..])).unwrap();
