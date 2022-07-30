@@ -1,5 +1,4 @@
 use core::fmt::{Debug, Display, Formatter};
-use core::pin::Pin;
 
 /// An error wrapper containing both an error and an owned value.
 ///
@@ -7,7 +6,7 @@ use core::pin::Pin;
 /// its reference handler failed.
 pub struct SelfieError<P, E> {
     /// The owned value.
-    pub owned: Pin<P>,
+    pub owned: P,
     /// The error value.
     pub error: E,
 }

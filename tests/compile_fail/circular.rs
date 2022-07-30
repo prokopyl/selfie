@@ -12,7 +12,7 @@ impl<'a> RefType<'a> for BarRef {
 }
 
 fn main() {
-    let value = Box::pin(());
+    let value = Box::new(());
 
     let mut selfie: Selfie<Box<()>, BarRef> =
         Selfie::new(value, |_| Bar(RefCell::new((None, "Hello".to_owned()))));

@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 #[test]
 pub fn simple_int() {
-    let my_int = Box::pin(42);
+    let my_int = Box::new(42);
     let data: Selfie<Box<i32>, Ref<i32>> = Selfie::new(my_int, |i| i);
 
     assert_eq!(42, *data.owned());
@@ -20,7 +20,7 @@ pub fn simple_int() {
 
 #[test]
 pub fn simple_str() {
-    let my_str = Pin::new("Hello, world!".to_owned());
+    let my_str = "Hello, world!".to_owned();
     let data: Selfie<String, Ref<str>> = Selfie::new(my_str, |i| &i[0..5]);
 
     assert_eq!("Hello, world!", data.owned());
@@ -34,7 +34,7 @@ pub fn simple_str() {
 
 #[test]
 pub fn different_int() {
-    let my_int = Arc::pin(42);
+    let my_int = Arc::new(42);
     let data: Selfie<Arc<i32>, Ref<i32>> = Selfie::new(my_int, |i| i);
 
     assert_eq!(42, *data.owned());
@@ -105,7 +105,7 @@ impl<'a> RefType<'a> for DropperRef {
 
 #[test]
 pub fn drops() {
-    let my_str = Pin::new("Hello".to_owned().into_boxed_str());
+    let my_str = "Hello".to_owned().into_boxed_str();
     let data: Selfie<Box<str>, DropperRef> = Selfie::new(my_str, |value| Dropper { value });
 
     assert_eq!("Hello", data.owned());
@@ -118,9 +118,8 @@ pub fn drops() {
     drop(data);
 }
 
-fn all_but_first_char(x: &RefCell<String>) -> Selfie<::core::cell::Ref<String>, Ref<str>> {
-    let x = Pin::new(x.borrow());
-    Selfie::new(x, |s| &s[1..])
+fn all_but_first_char(x: &RefCell<String>) -> Selfie<core::cell::Ref<String>, Ref<str>> {
+    Selfie::new(x.borrow(), |s| &s[1..])
 }
 
 #[test]

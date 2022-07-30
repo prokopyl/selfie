@@ -4,9 +4,9 @@ use std::pin::Pin;
 
 #[test]
 pub fn cascading() {
-    let my_str = Pin::new("Hello, world!".to_owned());
+    let my_str = "Hello, world!".to_owned();
     let selfie: Selfie<String, SelfieRef<Ref<str>, Ref<str>>> = Selfie::new(my_str, |i| {
-        let substr = Pin::new(&i[0..5]);
+        let substr = &i[0..5];
         Selfie::new(substr, |i| &i[3..])
     });
 
@@ -28,16 +28,12 @@ pub fn cascading() {
 
 #[test]
 pub fn more_cascading() {
-    let my_str = Pin::new("Hello, world!".to_owned());
+    let my_str = "Hello, world!".to_owned();
 
     #[allow(clippy::type_complexity)] // Yes, I know, that's the point
     let data: Selfie<String, SelfieRef<Ref<str>, SelfieRef<Ref<str>, Ref<str>>>> =
         Selfie::new(my_str, |i| {
-            let substr = Pin::new(&i[0..5]);
-            Selfie::new(substr, |i| {
-                let substr = Pin::new(&i[1..]);
-                Selfie::new(substr, |i| &i[2..])
-            })
+            Selfie::new(&i[0..5], |i| Selfie::new(&i[1..], |i| &i[2..]))
         });
 
     assert_eq!("Hello, world!", data.owned());

@@ -1,9 +1,9 @@
 error[E0505]: cannot move out of `selfie` because it is borrowed
-  --> tests/compile_fail/clone.rs:21:10
+  --> tests/compile_fail/clone.rs:20:10
    |
-20 |     let cloned = selfie.with_referential(|r| r.clone());
+19 |     let cloned = selfie.with_referential(|r| r.clone());
    |                  -------------------------------------- borrow of `selfie` occurs here
-21 |     drop(selfie); // Drops both data and selfie
+20 |     drop(selfie); // Drops both data and selfie
    |          ^^^^^^ move out of `selfie` occurs here
-22 |     println!("{}", cloned.inner); // Boom
+21 |     println!("{}", cloned.inner); // Boom
    |                    ------------ borrow later used here

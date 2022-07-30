@@ -1,12 +1,11 @@
 use selfie::refs::{Ref, RefType};
 use selfie::Selfie;
 use std::panic::catch_unwind;
-use std::pin::Pin;
 use std::rc::Rc;
 
 #[test]
 pub fn simple_map() {
-    let data = Pin::new("Hello, world!".to_owned());
+    let data = "Hello, world!".to_owned();
     let selfie: Selfie<String, Ref<str>> = Selfie::new(data, |str| &str[0..5]);
     selfie.with_referential(|s| assert_eq!("Hello", *s));
 
@@ -36,7 +35,7 @@ impl<'a> RefType<'a> for DropperRef {
 
 #[test]
 pub fn with_dropped_value() {
-    let my_str = Pin::new("Hello".to_owned().into_boxed_str());
+    let my_str = "Hello".to_owned().into_boxed_str();
     let data: Selfie<Box<str>, DropperRef> = Selfie::new(my_str, |value| Dropper { value });
 
     assert_eq!("Hello", data.owned());
@@ -51,7 +50,7 @@ pub fn with_dropped_value() {
 
 #[test]
 pub fn panic_with_dropped_value() {
-    let my_str = Pin::new("Hello".to_owned().into_boxed_str());
+    let my_str = "Hello".to_owned().into_boxed_str();
     let data: Selfie<Box<str>, DropperRef> = Selfie::new(my_str, |value| Dropper { value });
 
     assert_eq!("Hello", data.owned());
@@ -66,7 +65,7 @@ pub fn panic_with_dropped_value() {
 
 #[test]
 pub fn error_with_dropped_value() {
-    let my_str = Pin::new("Hello".to_owned().into_boxed_str());
+    let my_str = "Hello".to_owned().into_boxed_str();
     let data: Selfie<Box<str>, DropperRef> = Selfie::new(my_str, |value| Dropper { value });
 
     assert_eq!("Hello", data.owned());
@@ -83,7 +82,7 @@ pub fn error_with_dropped_value() {
 
 #[test]
 pub fn cloned_map() {
-    let data = Rc::pin("Hello, world!".to_owned());
+    let data = Rc::new("Hello, world!".to_owned());
     let selfie: Selfie<Rc<String>, Ref<str>> = Selfie::new(data, |str| &str[0..5]);
     selfie.with_referential(|s| assert_eq!("Hello", *s));
 

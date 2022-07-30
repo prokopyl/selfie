@@ -13,7 +13,7 @@ fn helper(owning_ref: Selfie<Box<Cell<u8>>, Ref<Cell<u8>>>) -> u8 {
 
 #[test]
 fn cell() {
-    let val = Box::pin(Cell::new(25));
+    let val = Box::new(Cell::new(25));
     let owning_ref = Selfie::new(val, |c| c);
     let res = helper(owning_ref);
     assert_eq!(res, 20);

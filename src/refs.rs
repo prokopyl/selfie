@@ -24,7 +24,6 @@ use core::pin::Pin;
 /// Implementing [`RefType`] for a custom referential type, so it can be used in a [`Selfie`]:
 ///
 /// ```
-/// use std::pin::Pin;
 /// use selfie::refs::RefType;
 /// use selfie::Selfie;
 ///
@@ -37,7 +36,7 @@ use core::pin::Pin;
 /// }
 ///
 /// // MyReferentialType can now be used in Selfies!
-/// let data = Pin::new("Hello, world!".to_owned());
+/// let data = "Hello, world!".to_owned();
 /// let selfie: Selfie<String, MyReferentialTypeStandIn> = Selfie::new(data, |str| MyReferentialType(&str[0..5]));
 ///
 /// assert_eq!("Hello", selfie.with_referential(|r| *r).0);
@@ -64,11 +63,10 @@ pub trait RefType<'a> {
 /// # Example
 ///
 /// ```
-/// use std::pin::Pin;
 /// use selfie::refs::Ref;
 /// use selfie::Selfie;
 ///
-/// let data = Pin::new("Hello, world!".to_owned());
+/// let data = "Hello, world!".to_owned();
 /// let selfie: Selfie<String, Ref<str>> = Selfie::new(data, |str| &str[0..5]);
 ///
 /// assert_eq!("Hello", selfie.with_referential(|r| *r));
@@ -105,14 +103,12 @@ impl<'a, T: 'a + ?Sized> RefType<'a> for Mut<T> {
 /// # Example
 ///
 /// ```
-/// use std::pin::Pin;
 /// use selfie::refs::{Ref, SelfieRef};
 /// use selfie::Selfie;
 ///
-/// let data = Pin::new("Hello, world!".to_owned());
+/// let data = "Hello, world!".to_owned();
 /// let selfie: Selfie<String, SelfieRef<Ref<str>, Ref<str>>> = Selfie::new(data, |str| {
-///     let substr = Pin::new(&str[0..5]);
-///     Selfie::new(substr, |str| &str[3..])
+///     Selfie::new(&str[0..5], |str| &str[3..])
 /// });
 ///
 /// assert_eq!("Hello, world!", selfie.owned());
