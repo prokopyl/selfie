@@ -30,8 +30,8 @@ impl<'a> Drop for Dropper<'a> {
 
 struct DropperRef;
 
-impl<'a> RefType<'a> for DropperRef {
-    type Ref = Dropper<'a>;
+impl<'owned> RefType<'owned> for DropperRef {
+    type Ref<'a> = Dropper<'a> where 'owned: 'a;
 }
 
 #[test]

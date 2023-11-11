@@ -5,7 +5,7 @@ use std::pin::Pin;
 
 // From https://github.com/Kimundi/owning-ref-rs/issues/49
 
-fn helper(owning_ref: Selfie<Box<Cell<u8>>, Ref<Cell<u8>>>) -> u8 {
+fn helper(owning_ref: Selfie<'static, Box<Cell<u8>>, Ref<Cell<u8>>>) -> u8 {
     owning_ref.owned().set(10);
     owning_ref.with_referential(|r| r.set(20));
     owning_ref.owned().get()
@@ -19,7 +19,7 @@ fn cell() {
     assert_eq!(res, 20);
 }
 
-fn helper_mut(owning_ref: SelfieMut<Box<Cell<u8>>, Mut<Cell<u8>>>) -> u8 {
+fn helper_mut(owning_ref: SelfieMut<'static, Box<Cell<u8>>, Mut<Cell<u8>>>) -> u8 {
     owning_ref.with_referential(|r| r.set(20));
     owning_ref.with_referential(|r| r.get())
 }

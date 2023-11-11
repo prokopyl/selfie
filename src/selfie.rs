@@ -60,21 +60,21 @@ use stable_deref_trait::{CloneStableDeref, StableDeref};
 pub struct Selfie<'a, P, R>
 where
     P: 'a,
-    R: for<'this> RefType<'this>,
+    R: RefType<'a>,
 {
     // SAFETY: enforce drop order!
     // SAFETY: Note that Ref's lifetime isn't actually ever 'a: it is the unnameable 'this instead.
     // Marking it as 'a is a trick to be able to store it and still name the whole type.
     // It is *absolutely* unsound to ever use this field as 'a, it should immediately be casted
     // to and from 'this instead.
-    referential: <R as RefType<'a>>::Ref,
+    referential: R::Ref<'a>,
     owned: Pin<P>,
 }
 
 impl<'a, P, R> Selfie<'a, P, R>
 where
     P: StableDeref + 'a,
-    R: for<'this> RefType<'this>,
+    R: RefType<'a>,
     P::Target: 'a,
 {
     /// Creates a new [`Selfie`] from a pinned pointer `P`, and a closure to create the reference
@@ -99,7 +99,7 @@ where
     #[inline]
     pub fn new<F>(owned: Pin<P>, handler: F) -> Self
     where
-        F: for<'this> FnOnce(&'this P::Target) -> <R as RefType<'this>>::Ref,
+        F: for<'this> FnOnce(&'this P::Target) -> R::Ref<'this>,
     {
         // SAFETY: This type does not expose anything that could expose referential longer than owned exists
         let detached = unsafe { detach_lifetime(owned.as_ref()) }.get_ref();
@@ -138,7 +138,7 @@ where
     #[inline]
     pub fn try_new<E, F>(owned: Pin<P>, handler: F) -> Result<Self, SelfieError<P, E>>
     where
-        F: for<'this> FnOnce(&'this P::Target) -> Result<<R as RefType<'this>>::Ref, E>,
+        F: for<'this> FnOnce(&'this P::Target) -> Result<R::Ref<'this>, E>,
     {
         // SAFETY: This type does not expose anything that could expose referential longer than owned exists
         let detached = unsafe { detach_lifetime(owned.as_ref()) }.get_ref();
@@ -185,7 +185,7 @@ where
     #[inline]
     pub fn with_referential<'s, F, T>(&'s self, handler: F) -> T
     where
-        F: for<'this> FnOnce(&'s <R as RefType<'this>>::Ref) -> T,
+        F: for<'this> FnOnce(&'s R::Ref<'this>) -> T,
     {
         // SAFETY: Down-casting is safe here, because Ref is actually 's, not 'a
         let referential = unsafe { downcast_ref::<'s, 'a, R>(&self.referential) };
@@ -216,7 +216,7 @@ where
     #[inline]
     pub fn with_referential_mut<'s, F, T>(&'s mut self, handler: F) -> T
     where
-        F: for<'this> FnOnce(&'s mut <R as RefType<'this>>::Ref) -> T,
+        F: for<'this> FnOnce(&'s mut R::Ref<'this>) -> T,
     {
         // SAFETY: Down-casting is safe here, because Ref is actually 's, not 'a
         let referential = unsafe { downcast_mut::<'s, 'a, R>(&mut self.referential) };
@@ -270,12 +270,9 @@ where
     /// assert_eq!("world!", selfie.with_referential(|r| *r));
     /// ```
     #[inline]
-    pub fn map<R2: for<'this> RefType<'this>, F>(self, mapper: F) -> Selfie<'a, P, R2>
+    pub fn map<R2: RefType<'a>, F>(self, mapper: F) -> Selfie<'a, P, R2>
     where
-        F: for<'this> FnOnce(
-            <R as RefType<'this>>::Ref,
-            &'this P::Target,
-        ) -> <R2 as RefType<'this>>::Ref,
+        F: for<'this> FnOnce(R::Ref<'this>, &'this P::Target) -> R2::Ref<'this>,
     {
         // SAFETY: here we break the lifetime guarantees: we must be very careful to not drop owned before referential
         let Self { owned, referential } = self;
@@ -320,15 +317,12 @@ where
     /// assert_eq!("world!", selfie.unwrap().with_referential(|r| *r));
     /// ```
     #[inline]
-    pub fn try_map<R2: for<'this> RefType<'this>, E, F>(
+    pub fn try_map<R2: RefType<'a>, E, F>(
         self,
         mapper: F,
     ) -> Result<Selfie<'a, P, R2>, SelfieError<P, E>>
     where
-        F: for<'this> FnOnce(
-            <R as RefType<'this>>::Ref,
-            &'this P::Target,
-        ) -> Result<<R2 as RefType<'this>>::Ref, E>,
+        F: for<'this> FnOnce(R::Ref<'this>, &'this P::Target) -> Result<R2::Ref<'this>, E>,
     {
         // SAFETY: here we break the lifetime guarantees: we must be very careful to not drop owned before referential
         let Self { owned, referential } = self;
@@ -346,7 +340,7 @@ where
     /// Creates a new [`Selfie`] by cloning this [`Selfie`]'s reference pointer `P` and producing
     /// a new reference (`R2`), using a given closure.
     ///
-    /// The owned pointer type `P` needs to be [`CloneStableDeref`](stable_deref_trait::CloneStableDeref),
+    /// The owned pointer type `P` needs to be [`CloneStableDeref`](CloneStableDeref),
     /// as only the pointer itself is going to be cloned, not the data behind it. Both the current
     /// reference `R` and the new `R2` will refer to the data behind `P`.
     ///
@@ -371,12 +365,9 @@ where
     /// second_selfie.with_referential(|s| assert_eq!("lo", *s)); // New one still works
     /// ```
     #[inline]
-    pub fn map_cloned<R2: for<'this> RefType<'this>, F>(&self, mapper: F) -> Selfie<'a, P, R2>
+    pub fn map_cloned<R2: RefType<'a>, F>(&self, mapper: F) -> Selfie<'a, P, R2>
     where
-        F: for<'this> FnOnce(
-            &<R as RefType<'this>>::Ref,
-            &'this P::Target,
-        ) -> <R2 as RefType<'this>>::Ref,
+        F: for<'this> FnOnce(&R::Ref<'this>, &'this P::Target) -> R2::Ref<'this>,
         P: CloneStableDeref,
     {
         let owned = self.owned.clone();
@@ -391,7 +382,7 @@ where
     /// Creates a new [`Selfie`] by cloning this [`Selfie`]'s reference pointer `P` and producing
     /// a new reference (`R2`), using a given fallible closure.
     ///
-    /// The owned pointer type `P` needs to be [`CloneStableDeref`](stable_deref_trait::CloneStableDeref),
+    /// The owned pointer type `P` needs to be [`CloneStableDeref`](CloneStableDeref),
     /// as only the pointer itself is going to be cloned, not the data behind it. Both the current
     /// reference `R` and the new `R2` will refer to the data behind `P`.
     ///
@@ -421,15 +412,9 @@ where
     /// second_selfie.with_referential(|s| assert_eq!("lo", *s)); // New one still works
     /// ```
     #[inline]
-    pub fn try_map_cloned<R2: for<'this> RefType<'this>, E, F>(
-        &self,
-        mapper: F,
-    ) -> Result<Selfie<'a, P, R2>, E>
+    pub fn try_map_cloned<R2: RefType<'a>, E, F>(&self, mapper: F) -> Result<Selfie<'a, P, R2>, E>
     where
-        F: for<'this> FnOnce(
-            &<R as RefType<'this>>::Ref,
-            &'this P::Target,
-        ) -> Result<<R2 as RefType<'this>>::Ref, E>,
+        F: for<'this> FnOnce(&R::Ref<'this>, &'this P::Target) -> Result<R2::Ref<'this>, E>,
         P: CloneStableDeref,
     {
         let owned = self.owned.clone();
@@ -489,17 +474,17 @@ where
 pub struct SelfieMut<'a, P, R>
 where
     P: 'a,
-    R: for<'this> RefType<'this>,
+    R: RefType<'a>,
 {
     // SAFETY: enforce drop order!
-    referential: <R as RefType<'a>>::Ref,
+    referential: R::Ref<'a>,
     owned: Pin<P>,
 }
 
 impl<'a, P, R> SelfieMut<'a, P, R>
 where
     P: StableDeref + DerefMut + 'a,
-    R: for<'this> RefType<'this>,
+    R: RefType<'a>,
 {
     /// Creates a new [`SelfieMut`] from a pinned pointer `P`, and a closure to create the reference
     /// type `R` from a pinned, exclusive reference to the data behind `P`.
@@ -522,7 +507,7 @@ where
     /// ```
     pub fn new<F>(mut owned: Pin<P>, handler: F) -> Self
     where
-        F: for<'this> FnOnce(Pin<&'this mut P::Target>) -> <R as RefType<'this>>::Ref,
+        F: for<'this> FnOnce(Pin<&'this mut P::Target>) -> R::Ref<'this>,
     {
         // SAFETY: This type does not expose anything that could expose referential longer than owned exists
         let detached = unsafe { detach_lifetime_mut(owned.as_mut()) };
@@ -561,7 +546,7 @@ where
     #[inline]
     pub fn try_new<E, F>(mut owned: Pin<P>, handler: F) -> Result<Self, SelfieError<P, E>>
     where
-        F: for<'this> FnOnce(Pin<&'this mut P::Target>) -> Result<<R as RefType<'this>>::Ref, E>,
+        F: for<'this> FnOnce(Pin<&'this mut P::Target>) -> Result<R::Ref<'this>, E>,
     {
         // SAFETY: This type does not expose anything that could expose referential longer than owned exists
         let detached = unsafe { detach_lifetime_mut(owned.as_mut()) };
@@ -590,7 +575,7 @@ where
     #[inline]
     pub fn with_referential<'s, F, T>(&'s self, handler: F) -> T
     where
-        F: for<'this> FnOnce(&'s <R as RefType<'this>>::Ref) -> T,
+        F: for<'this> FnOnce(&'s R::Ref<'this>) -> T,
     {
         // SAFETY: Down-casting is safe here, because Ref is actually 's, not 'a
         let referential = unsafe { downcast_ref::<'s, 'a, R>(&self.referential) };
@@ -619,7 +604,7 @@ where
     #[inline]
     pub fn with_referential_mut<'s, F, T>(&'s mut self, handler: F) -> T
     where
-        F: for<'this> FnOnce(&'s mut <R as RefType<'this>>::Ref) -> T,
+        F: for<'this> FnOnce(&'s mut R::Ref<'this>) -> T,
     {
         // SAFETY: Down-casting is safe here, because Ref is actually 's, not 'a
         let referential = unsafe { downcast_mut::<'s, 'a, R>(&mut self.referential) };
@@ -668,12 +653,12 @@ where
     /// selfie.with_referential(|s| assert_eq!("lo", *s));
     /// ```
     #[inline]
-    pub fn map<R2: for<'this> RefType<'this>, F>(self, mapper: F) -> Selfie<'a, P, R2>
+    pub fn map<R2: RefType<'a>, F>(self, mapper: F) -> Selfie<'a, P, R2>
     where
         F: for<'this> FnOnce(
-            <R as RefType<'this>>::Ref,
+            R::Ref<'this>,
             &'this (), // This is needed to constrain the lifetime TODO: find a way to remove this
-        ) -> <R2 as RefType<'this>>::Ref,
+        ) -> R2::Ref<'this>,
     {
         // SAFETY: here we break the lifetime guarantees: we must be very careful to not drop owned before referential
         let Self { owned, referential } = self;
@@ -711,15 +696,15 @@ where
     /// selfie.with_referential(|s| assert_eq!("lo", *s));
     /// ```
     #[inline]
-    pub fn try_map<R2: for<'this> RefType<'this>, E, F>(
+    pub fn try_map<R2: RefType<'a>, E, F>(
         self,
         mapper: F,
     ) -> Result<Selfie<'a, P, R2>, SelfieError<P, E>>
     where
         F: for<'this> FnOnce(
-            <R as RefType<'this>>::Ref,
+            R::Ref<'this>,
             &'this (), // This is needed to constrain the lifetime TODO: find a way to remove this
-        ) -> Result<<R2 as RefType<'this>>::Ref, E>,
+        ) -> Result<R2::Ref<'this>, E>,
     {
         // SAFETY: here we break the lifetime guarantees: we must be very careful to not drop owned before referential
         let Self { owned, referential } = self;

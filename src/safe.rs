@@ -9,9 +9,9 @@ use stable_deref_trait::StableDeref;
 impl<'a, P, R> Debug for Selfie<'a, P, R>
 where
     P::Target: Debug,
-    for<'this> <R as RefType<'this>>::Ref: Debug,
+    for<'this> R::Ref<'this>: Debug,
     P: 'a + StableDeref,
-    R: for<'this> RefType<'this>,
+    R: RefType<'a>,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         self.with_referential(|referential| {
@@ -25,9 +25,9 @@ where
 
 impl<'a, P, R> Debug for SelfieMut<'a, P, R>
 where
-    for<'this> <R as RefType<'this>>::Ref: Debug,
+    for<'this> R::Ref<'this>: Debug,
     P: StableDeref + DerefMut + 'a,
-    R: for<'this> RefType<'this>,
+    R: RefType<'a>,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         self.with_referential(|referential| {

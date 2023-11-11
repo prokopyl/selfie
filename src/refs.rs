@@ -54,9 +54,11 @@ use core::pin::Pin;
 ///
 /// assert_eq!(STR_1, STR_2);
 /// ```
-pub trait RefType<'a> {
+pub trait RefType<'owned>: 'owned {
     /// The full reference type that is to be created when combined with the lifetime `'a`.
-    type Ref: 'a + Sized;
+    type Ref<'a>: 'a + Sized
+    where
+        'owned: 'a;
 }
 
 /// A stand-in for a shared reference `&T`.
@@ -75,8 +77,11 @@ pub trait RefType<'a> {
 /// ```
 pub struct Ref<T: ?Sized>(PhantomData<T>);
 
-impl<'a, T: 'a + ?Sized> RefType<'a> for Ref<T> {
-    type Ref = &'a T;
+impl<'owned, T: 'owned + ?Sized> RefType<'owned> for Ref<T> {
+    type Ref<'a>
+    = &'a T
+        where
+            'owned: 'a;
 }
 
 /// A stand-in for a mutable reference `&mut T`.
@@ -96,8 +101,8 @@ impl<'a, T: 'a + ?Sized> RefType<'a> for Ref<T> {
 /// ```
 pub struct Mut<T: ?Sized>(PhantomData<T>);
 
-impl<'a, T: 'a + ?Sized> RefType<'a> for Mut<T> {
-    type Ref = &'a mut T;
+impl<'owned, T: 'owned + ?Sized> RefType<'owned> for Mut<T> {
+    type Ref<'a> = &'a mut T where 'owned: 'a;
 }
 
 /// A stand-in for a [`Selfie`](crate::Selfie) holding a reference type as its owned pointer.
@@ -126,12 +131,12 @@ where
     P: ?Sized,
     R: ?Sized;
 
-impl<'a, P, R> RefType<'a> for SelfieRef<P, R>
+impl<'owned, P, R> RefType<'owned> for SelfieRef<P, R>
 where
-    P: RefType<'a>,
-    R: 'a + for<'this> RefType<'this>,
+    P: RefType<'owned>,
+    for<'x> R: RefType<'x>,
 {
-    type Ref = Selfie<'a, P::Ref, R>;
+    type Ref<'a> = Selfie<'a, P::Ref<'a>, R> where 'owned: 'a;
 }
 
 /// A stand-in for a [`SelfieMut`](crate::SelfieMut) holding a reference type as its owned pointer.
@@ -158,22 +163,23 @@ where
     P: ?Sized,
     R: ?Sized;
 
-impl<'a, P, R> RefType<'a> for SelfieRefMut<P, R>
+impl<'owned, P, R> RefType<'owned> for SelfieRefMut<P, R>
 where
-    P: RefType<'a>,
-    R: 'a + for<'this> RefType<'this>,
+    P: RefType<'owned>,
+    for<'x> R: RefType<'x>,
+    R: 'owned,
 {
-    type Ref = SelfieMut<'a, P::Ref, R>;
+    type Ref<'a> = SelfieMut<'a, P::Ref<'a>, R> where 'owned: 'a;
 }
 
 // Other std types
 
-impl<'a, R: RefType<'a>> RefType<'a> for Option<R> {
-    type Ref = Option<R::Ref>;
+impl<'owned, R: RefType<'owned>> RefType<'owned> for Option<R> {
+    type Ref<'a> = Option<R::Ref<'a>> where 'owned: 'a;
 }
 
-impl<'a, R: RefType<'a>> RefType<'a> for Pin<R> {
-    type Ref = Pin<R::Ref>;
+impl<'owned, R: RefType<'owned>> RefType<'owned> for Pin<R> {
+    type Ref<'a> = Pin<R::Ref<'a>> where 'owned: 'a;
 }
 
 #[cfg(any(feature = "alloc", feature = "std"))]
@@ -185,15 +191,15 @@ mod alloc_impl {
     use alloc::rc::Rc;
     use alloc::sync::Arc;
 
-    impl<'a, R: RefType<'a>> RefType<'a> for Box<R> {
-        type Ref = Box<R::Ref>;
+    impl<'owned, R: RefType<'owned>> RefType<'owned> for Box<R> {
+        type Ref<'a> = Box<R::Ref<'a>> where 'owned: 'a;
     }
 
-    impl<'a, R: RefType<'a>> RefType<'a> for Rc<R> {
-        type Ref = Rc<R::Ref>;
+    impl<'owned, R: RefType<'owned>> RefType<'owned> for Rc<R> {
+        type Ref<'a> = Rc<R::Ref<'a>> where 'owned: 'a;
     }
 
-    impl<'a, R: RefType<'a>> RefType<'a> for Arc<R> {
-        type Ref = Arc<R::Ref>;
+    impl<'owned, R: RefType<'owned>> RefType<'owned> for Arc<R> {
+        type Ref<'a> = Arc<R::Ref<'a>> where 'owned: 'a;
     }
 }
