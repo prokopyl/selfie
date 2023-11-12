@@ -60,7 +60,7 @@ use stable_deref_trait::{CloneStableDeref, StableDeref};
 pub struct Selfie<'a, P, R>
 where
     P: 'a,
-    R: RefType<'a>,
+    R: RefType,
 {
     // SAFETY: enforce drop order!
     // SAFETY: Note that Ref's lifetime isn't actually ever 'a: it is the unnameable 'this instead.
@@ -74,7 +74,7 @@ where
 impl<'a, P, R> Selfie<'a, P, R>
 where
     P: StableDeref + 'a,
-    R: RefType<'a>,
+    R: RefType,
     P::Target: 'a,
 {
     /// Creates a new [`Selfie`] from a pinned pointer `P`, and a closure to create the reference
@@ -270,7 +270,7 @@ where
     /// assert_eq!("world!", selfie.with_referential(|r| *r));
     /// ```
     #[inline]
-    pub fn map<R2: RefType<'a>, F>(self, mapper: F) -> Selfie<'a, P, R2>
+    pub fn map<R2: RefType, F>(self, mapper: F) -> Selfie<'a, P, R2>
     where
         F: for<'this> FnOnce(R::Ref<'this>, &'this P::Target) -> R2::Ref<'this>,
     {
@@ -317,7 +317,7 @@ where
     /// assert_eq!("world!", selfie.unwrap().with_referential(|r| *r));
     /// ```
     #[inline]
-    pub fn try_map<R2: RefType<'a>, E, F>(
+    pub fn try_map<R2: RefType, E, F>(
         self,
         mapper: F,
     ) -> Result<Selfie<'a, P, R2>, SelfieError<P, E>>
@@ -365,7 +365,7 @@ where
     /// second_selfie.with_referential(|s| assert_eq!("lo", *s)); // New one still works
     /// ```
     #[inline]
-    pub fn map_cloned<R2: RefType<'a>, F>(&self, mapper: F) -> Selfie<'a, P, R2>
+    pub fn map_cloned<R2: RefType, F>(&self, mapper: F) -> Selfie<'a, P, R2>
     where
         F: for<'this> FnOnce(&R::Ref<'this>, &'this P::Target) -> R2::Ref<'this>,
         P: CloneStableDeref,
@@ -412,7 +412,7 @@ where
     /// second_selfie.with_referential(|s| assert_eq!("lo", *s)); // New one still works
     /// ```
     #[inline]
-    pub fn try_map_cloned<R2: RefType<'a>, E, F>(&self, mapper: F) -> Result<Selfie<'a, P, R2>, E>
+    pub fn try_map_cloned<R2: RefType, E, F>(&self, mapper: F) -> Result<Selfie<'a, P, R2>, E>
     where
         F: for<'this> FnOnce(&R::Ref<'this>, &'this P::Target) -> Result<R2::Ref<'this>, E>,
         P: CloneStableDeref,
@@ -474,7 +474,7 @@ where
 pub struct SelfieMut<'a, P, R>
 where
     P: 'a,
-    R: RefType<'a>,
+    R: RefType,
 {
     // SAFETY: enforce drop order!
     referential: R::Ref<'a>,
@@ -484,7 +484,7 @@ where
 impl<'a, P, R> SelfieMut<'a, P, R>
 where
     P: StableDeref + DerefMut + 'a,
-    R: RefType<'a>,
+    R: RefType,
 {
     /// Creates a new [`SelfieMut`] from a pinned pointer `P`, and a closure to create the reference
     /// type `R` from a pinned, exclusive reference to the data behind `P`.
@@ -653,7 +653,7 @@ where
     /// selfie.with_referential(|s| assert_eq!("lo", *s));
     /// ```
     #[inline]
-    pub fn map<R2: RefType<'a>, F>(self, mapper: F) -> Selfie<'a, P, R2>
+    pub fn map<R2: RefType, F>(self, mapper: F) -> Selfie<'a, P, R2>
     where
         F: for<'this> FnOnce(
             R::Ref<'this>,
@@ -696,7 +696,7 @@ where
     /// selfie.with_referential(|s| assert_eq!("lo", *s));
     /// ```
     #[inline]
-    pub fn try_map<R2: RefType<'a>, E, F>(
+    pub fn try_map<R2: RefType, E, F>(
         self,
         mapper: F,
     ) -> Result<Selfie<'a, P, R2>, SelfieError<P, E>>

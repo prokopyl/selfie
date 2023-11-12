@@ -11,7 +11,7 @@ where
     P::Target: Debug,
     for<'this> R::Ref<'this>: Debug,
     P: 'a + StableDeref,
-    R: RefType<'a>,
+    R: RefType,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         self.with_referential(|referential| {
@@ -27,7 +27,7 @@ impl<'a, P, R> Debug for SelfieMut<'a, P, R>
 where
     for<'this> R::Ref<'this>: Debug,
     P: StableDeref + DerefMut + 'a,
-    R: RefType<'a>,
+    R: RefType,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         self.with_referential(|referential| {

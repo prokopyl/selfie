@@ -18,14 +18,14 @@ pub unsafe fn detach_lifetime_mut<'this, T: ?Sized>(pin: Pin<&mut T>) -> Pin<&'t
 }
 
 #[inline]
-pub unsafe fn downcast_ref<'s, 'owned: 's, R: RefType<'owned> + ?Sized>(
+pub unsafe fn downcast_ref<'s, 'owned: 's, R: RefType + ?Sized>(
     referential: &'s R::Ref<'owned>,
 ) -> &'s R::Ref<'s> {
     ::core::mem::transmute(referential)
 }
 
 #[inline]
-pub unsafe fn downcast_mut<'s, 'owned: 's, R: RefType<'owned> + ?Sized>(
+pub unsafe fn downcast_mut<'s, 'owned: 's, R: RefType + ?Sized>(
     referential: &'s mut R::Ref<'owned>,
 ) -> &'s mut R::Ref<'s> {
     ::core::mem::transmute(referential)

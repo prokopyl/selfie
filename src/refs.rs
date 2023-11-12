@@ -1,11 +1,11 @@
-//! Reference type stand-ins, to be used with [`Selfie`](crate::Selfie) and
-//! [`SelfieMut`](crate::SelfieMut) type declarations.
+//! Reference type stand-ins, to be used with [`Selfie`](Selfie) and
+//! [`SelfieMut`](SelfieMut) type declarations.
 //!
 //! These types are stand-ins that allow to name reference types without naming any associated
 //! lifetime. The full type can then be reconstructed with an arbitrary lifetime using the
 //! [`RefType`] trait.
 //!
-//! This is necessary for [`Selfie`](crate::Selfie), as it has to work with a self-referential
+//! This is necessary for [`Selfie`](Selfie), as it has to work with a self-referential
 //! lifetime, which cannot be explicitly named and has to be reconstructed internally.
 //! In essence, this is a roundabout way to achieve Higher-Kinded Polymorphism.
 //!
@@ -54,11 +54,9 @@ use core::pin::Pin;
 ///
 /// assert_eq!(STR_1, STR_2);
 /// ```
-pub trait RefType<'owned>: 'owned {
+pub trait RefType {
     /// The full reference type that is to be created when combined with the lifetime `'a`.
-    type Ref<'a>: 'a + Sized
-    where
-        'owned: 'a;
+    type Ref<'a>: 'a + Sized;
 }
 
 /// A stand-in for a shared reference `&T`.
@@ -77,11 +75,8 @@ pub trait RefType<'owned>: 'owned {
 /// ```
 pub struct Ref<T: ?Sized>(PhantomData<T>);
 
-impl<'owned, T: 'owned + ?Sized> RefType<'owned> for Ref<T> {
-    type Ref<'a>
-    = &'a T
-        where
-            'owned: 'a;
+impl<T: ?Sized> RefType for Ref<T> {
+    type Ref<'a> = &'a T where T: 'a;
 }
 
 /// A stand-in for a mutable reference `&mut T`.
@@ -101,11 +96,11 @@ impl<'owned, T: 'owned + ?Sized> RefType<'owned> for Ref<T> {
 /// ```
 pub struct Mut<T: ?Sized>(PhantomData<T>);
 
-impl<'owned, T: 'owned + ?Sized> RefType<'owned> for Mut<T> {
-    type Ref<'a> = &'a mut T where 'owned: 'a;
+impl<T: ?Sized> RefType for Mut<T> {
+    type Ref<'a> = &'a mut T where T: 'a;
 }
 
-/// A stand-in for a [`Selfie`](crate::Selfie) holding a reference type as its owned pointer.
+/// A stand-in for a [`Selfie`](Selfie) holding a reference type as its owned pointer.
 ///
 /// # Example
 ///
@@ -131,15 +126,15 @@ where
     P: ?Sized,
     R: ?Sized;
 
-impl<'owned, P, R> RefType<'owned> for SelfieRef<P, R>
+impl<P, R> RefType for SelfieRef<P, R>
 where
-    P: RefType<'owned>,
-    for<'x> R: RefType<'x>,
+    P: RefType,
+    R: RefType,
 {
-    type Ref<'a> = Selfie<'a, P::Ref<'a>, R> where 'owned: 'a;
+    type Ref<'a> = Selfie<'a, P::Ref<'a>, R>;
 }
 
-/// A stand-in for a [`SelfieMut`](crate::SelfieMut) holding a reference type as its owned pointer.
+/// A stand-in for a [`SelfieMut`](SelfieMut) holding a reference type as its owned pointer.
 ///
 /// # Example
 ///
@@ -163,23 +158,22 @@ where
     P: ?Sized,
     R: ?Sized;
 
-impl<'owned, P, R> RefType<'owned> for SelfieRefMut<P, R>
+impl<P, R> RefType for SelfieRefMut<P, R>
 where
-    P: RefType<'owned>,
-    for<'x> R: RefType<'x>,
-    R: 'owned,
+    P: RefType,
+    R: RefType,
 {
-    type Ref<'a> = SelfieMut<'a, P::Ref<'a>, R> where 'owned: 'a;
+    type Ref<'a> = SelfieMut<'a, P::Ref<'a>, R>;
 }
 
 // Other std types
 
-impl<'owned, R: RefType<'owned>> RefType<'owned> for Option<R> {
-    type Ref<'a> = Option<R::Ref<'a>> where 'owned: 'a;
+impl<R: RefType> RefType for Option<R> {
+    type Ref<'a> = Option<R::Ref<'a>>;
 }
 
-impl<'owned, R: RefType<'owned>> RefType<'owned> for Pin<R> {
-    type Ref<'a> = Pin<R::Ref<'a>> where 'owned: 'a;
+impl<R: RefType> RefType for Pin<R> {
+    type Ref<'a> = Pin<R::Ref<'a>>;
 }
 
 #[cfg(any(feature = "alloc", feature = "std"))]
@@ -191,15 +185,15 @@ mod alloc_impl {
     use alloc::rc::Rc;
     use alloc::sync::Arc;
 
-    impl<'owned, R: RefType<'owned>> RefType<'owned> for Box<R> {
-        type Ref<'a> = Box<R::Ref<'a>> where 'owned: 'a;
+    impl<'owned, R: RefType> RefType for Box<R> {
+        type Ref<'a> = Box<R::Ref<'a>>;
     }
 
-    impl<'owned, R: RefType<'owned>> RefType<'owned> for Rc<R> {
-        type Ref<'a> = Rc<R::Ref<'a>> where 'owned: 'a;
+    impl<'owned, R: RefType> RefType for Rc<R> {
+        type Ref<'a> = Rc<R::Ref<'a>>;
     }
 
-    impl<'owned, R: RefType<'owned>> RefType<'owned> for Arc<R> {
-        type Ref<'a> = Arc<R::Ref<'a>> where 'owned: 'a;
+    impl<'owned, R: RefType> RefType for Arc<R> {
+        type Ref<'a> = Arc<R::Ref<'a>>;
     }
 }
