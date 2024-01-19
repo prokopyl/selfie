@@ -1,6 +1,10 @@
 use selfie::refs::{Mut, Ref, SelfieRef, SelfieRefMut};
 use selfie::{Selfie, SelfieMut};
+use std::cell::Cell;
+use std::fmt::{Debug, Display};
+use std::future::Future;
 use std::pin::Pin;
+use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 
 #[test]
 pub fn cascading() {
@@ -64,6 +68,54 @@ pub fn more_cascading() {
         })
     });
 }
+
+//struct ReturnThroughAwait<T: ?Sized>();
+
+fn noop_waker() -> Waker {
+    const VTABLE: RawWakerVTable = RawWakerVTable::new(
+        // Cloning just returns a new no-op raw waker
+        |_| RAW,
+        // `wake` does nothing
+        |_| {},
+        // `wake_by_ref` does nothing
+        |_| {},
+        // Dropping does nothing as we don't allocate anything
+        |_| {},
+    );
+    const RAW: RawWaker = RawWaker::new(core::ptr::null(), &VTABLE);
+
+    unsafe { Waker::from_raw(RAW) }
+}
+
+struct NeverFuture;
+
+impl Future for NeverFuture {
+    type Output = ();
+
+    #[inline]
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        Poll::Pending
+    }
+}
+
+#[test]
+pub fn async_test() {
+    let mut string = b"Hello_world!".to_vec();
+    //let mut ctx = Cell::new(core::ptr::null_mut());
+    let mut fut = async move {
+        let mut bytes = string;
+        let mut referential = &mut bytes[0..5];
+        //ctx.set(&mut referential);
+        NeverFuture.await;
+    };
+
+    dbg!(core::mem::size_of_val(&fut));
+
+    let mut fut_2 = Box::pin(fut);
+    let wk = noop_waker();
+    let _ = fut_2.as_mut().poll(&mut Context::from_waker(&wk));
+}
+type X = fn(*const u8) -> dyn Future<Output = ()>;
 
 #[test]
 pub fn cascading_mut() {

@@ -4,10 +4,18 @@
 #![deny(clippy::all)]
 #![deny(missing_docs)]
 
+extern crate alloc;
+
+#[cfg(test)]
+#[macro_use]
+extern crate std;
+
 pub mod refs;
 pub(crate) mod utils;
 
+mod async_util;
 mod error;
+mod stack_async;
 pub use error::*;
 
 mod selfie;
