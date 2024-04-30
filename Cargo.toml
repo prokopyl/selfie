@@ -1,6 +1,6 @@
 [package]
 name = "selfie"
-version = "0.0.2"
+version = "0.0.3"
 rust-version = "1.56"
 edition = "2021"
 
