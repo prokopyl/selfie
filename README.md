@@ -1,3 +1,13 @@
+### _ABANDONED_: This crate is unsound and no longer maintained_
+
+This experimental project is no longer maintained, as there are
+[some soundness issues](https://users.rust-lang.org/t/soundness-review-for-selfie-my-personal-self-referential-struct-library/79010/12)
+inherent to the approach used by this library.
+
+Users are encouraged to migrate towards actually sound, stable self-referential libraries, such as
+[`ouroboros`](https://github.com/someguynamedjosh/ouroboros) or
+[`nolife`](https://github.com/dureuill/nolife).
+
 # Selfie
 
 [![Cargo](https://img.shields.io/crates/v/selfie.svg)](https://crates.io/crates/selfie)
